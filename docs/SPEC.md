@@ -22,6 +22,12 @@ Local Python service that drives a Luxafor Flag from three signals: Outlook cale
    `reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone" /s`
    Note the exact Teams subkey name and confirm its `LastUsedTimeStop` value is `0` while the call is live.
 
+**Probe results (2026-10-22, Windows 11, `python -m luxstatus.probe`):**
+
+- HID: one interface, `LUXAFOR FLAG`, usage page `0xFF00`; 9-byte static-colour reports are accepted.
+- Registry: new Teams is the packaged key `MSTeams_8wekyb3d8bbwe` under both `microphone` and `webcam`. During a test call both showed `LastUsedTimeStop = 0`, and the devices source reported `CALL — MSTeams (mic + camera)`.
+- Outlook: classic Outlook is running, locale `English_United States`. The `Restrict` filter ran without error but the window had no items, so the date format and item times are not confirmed yet.
+
 ## Architecture
 
 ```

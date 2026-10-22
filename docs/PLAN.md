@@ -11,9 +11,9 @@ CI runs the unit tests on both `ubuntu-latest` and `windows-latest`. The Windows
 
 | # | Milestone | Verified by |
 |---|---|---|
-| 0 | **Probe** — `uv run python -m luxstatus.probe` runs the three "before building" checks from the spec (HID enumeration, ConsentStore entries, upcoming Outlook items) using the real adapter code. `--light` also flashes the Flag. | Run on the Windows machine; paste the output back |
-| 1 | **Core** — config, `Status`/`SourceUpdate`, pure resolver (priority, staleness, expiry), engine loop with a fake light, debouncer, registry-tree and calendar logic, manual override. | `uv run pytest` |
-| 2 | **Light driver + CLI** — `python -m luxstatus.light busy`; reconnects and resends after unplug/replug. | Hardware |
+| 0 ✅ | **Probe** — `uv run python -m luxstatus.probe` runs the three "before building" checks from the spec (HID enumeration, ConsentStore entries, upcoming Outlook items) using the real adapter code. `--light` also flashes the Flag. | Run on the Windows machine; paste the output back |
+| 1 ✅ | **Core** — config, `Status`/`SourceUpdate`, pure resolver (priority, staleness, expiry), engine loop with a fake light, debouncer, registry-tree and calendar logic, manual override. | `uv run pytest` |
+| 2 🔶 | **Light driver + CLI** — `python -m luxstatus.light busy`; rewrites the colour every tick and reconnects after unplug/replug. | Code done; needs a replug test on hardware |
 | 3 | **Devices source** — `winreg` poller, process check, wired into the engine. Light follows a Teams test call. | Teams call |
 | 4 | **Tray + manual override + hotkeys** — pystray on the main thread, engine on a worker thread, `RegisterHotKey` thread. | Manual |
 | 5 | **Outlook source** — dedicated COM thread with look-ahead fetch. | Classic Outlook |

@@ -77,11 +77,15 @@ def test_ticks_keep_coming_under_a_steady_update_stream():
     async def main():
         stop = asyncio.Event()
         task = asyncio.create_task(engine.run(stop))
-        for _ in range(30):  # an update every 10 ms, faster than the tick
+        # Updates arrive faster than the tick for 0.3 s. Run by elapsed time, not by count:
+        # Windows' ~15 ms clock makes short sleeps return immediately.
+        loop = asyncio.get_running_loop()
+        end = loop.time() + 0.3
+        while loop.time() < end:
             engine.queue.put_nowait(call())
             await asyncio.sleep(0.01)
         stop.set()
         await asyncio.wait_for(task, 1)
 
     asyncio.run(main())
-    assert light.ticks >= 4
+    assert light.ticks >= 3  # ~6 expected

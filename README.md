@@ -4,7 +4,7 @@ Drives a Luxafor Flag from your Outlook calendar, microphone/camera use and a ma
 
 ## Status
 
-Milestones 0 (probe) and 1 (core logic) are done. The app itself is not runnable yet.
+Milestones 0 (probe) and 1 (core logic) are done; milestone 2 (light driver) is written and awaiting a hardware test. The full app is not runnable yet.
 
 ## Development
 
@@ -30,3 +30,13 @@ Run it once while idle and once during a Teams test call, and send back both out
 1. **HID** — whether the Flag enumerates at VID `0x04D8`, PID `0xF372`.
 2. **Mic/camera registry** — every ConsentStore entry, which ones read as in use, and which ones luxstatus would report as a call with the default filters.
 3. **Outlook** — whether classic Outlook is running, the `Restrict` filter string, and the calendar items for the next few hours as luxstatus sees them.
+
+## Light CLI (milestone 2)
+
+```powershell
+uv run python -m luxstatus.light busy              # status name: off, available, tentative, busy, call, dnd
+uv run python -m luxstatus.light 0,0,255           # or r,g,b
+uv run python -m luxstatus.light dnd --watch       # hold the colour; Ctrl+C turns it off
+```
+
+With `--watch`, unplug the Flag and plug it back in: the colour should return within about 5 seconds.
