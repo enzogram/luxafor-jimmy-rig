@@ -56,3 +56,21 @@ def test_bad_toml_raises(tmp_path):
     p.write_text("[colours\n")
     with pytest.raises(config.ConfigError):
         load(p)
+
+
+def test_find_config_order(tmp_path):
+    from luxstatus.config import find_config
+
+    appdata, cwd, exe_dir = tmp_path / "appdata", tmp_path / "cwd", tmp_path / "exe"
+    for d in (appdata / "luxstatus", cwd, exe_dir):
+        d.mkdir(parents=True)
+    explicit = tmp_path / "mine.toml"
+    assert find_config(explicit, str(appdata), cwd, exe_dir) == explicit
+    assert find_config(None, str(appdata), cwd, exe_dir) is None
+    (exe_dir / "config.toml").write_text("")
+    assert find_config(None, str(appdata), cwd, exe_dir) == exe_dir / "config.toml"
+    (cwd / "config.toml").write_text("")
+    assert find_config(None, str(appdata), cwd, exe_dir) == cwd / "config.toml"
+    (appdata / "luxstatus" / "config.toml").write_text("")
+    assert find_config(None, str(appdata), cwd, None) == appdata / "luxstatus" / "config.toml"
+    assert find_config(None, None, cwd, None) == cwd / "config.toml"

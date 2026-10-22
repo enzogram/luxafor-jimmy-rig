@@ -82,6 +82,27 @@ class Config:
     resolver: ResolverConfig = field(default_factory=ResolverConfig)
 
 
+def find_config(
+    explicit: Path | None,
+    appdata: str | None,
+    cwd: Path,
+    exe_dir: Path | None,
+) -> Path | None:
+    """First of: --config, %APPDATA%\\luxstatus\\config.toml, ./config.toml, next to the exe.
+
+    An explicit path is returned even if missing, so a typo shows up as "defaults" in the log.
+    """
+    if explicit is not None:
+        return explicit
+    candidates = []
+    if appdata:
+        candidates.append(Path(appdata) / "luxstatus" / "config.toml")
+    candidates.append(cwd / "config.toml")
+    if exe_dir is not None:
+        candidates.append(exe_dir / "config.toml")
+    return next((p for p in candidates if p.exists()), None)
+
+
 def load(path: Path | None) -> Config:
     """Load config from ``path``; a missing or ``None`` path gives the defaults."""
     if path is None or not path.exists():

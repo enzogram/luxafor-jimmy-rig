@@ -14,8 +14,12 @@ LIVE = {"LastUsedTimeStart": 134000000000000000, "LastUsedTimeStop": 0}
 
 
 def test_default_pollers_respect_enabled():
-    assert [p.name for p in default_pollers(Config())] == ["devices"]
-    off = replace(Config(), devices=replace(Config().devices, enabled=False))
+    assert [p.name for p in default_pollers(Config())] == ["devices", "session"]
+    off = replace(
+        Config(),
+        devices=replace(Config().devices, enabled=False),
+        session=replace(Config().session, enabled=False),
+    )
     assert default_pollers(off) == []
 
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
 import threading
 from collections.abc import Callable
@@ -26,6 +27,7 @@ from luxstatus.light import HidLight
 from luxstatus.sources.devices import DevicesSource
 from luxstatus.sources.manual import ManualControl
 from luxstatus.sources.outlook import OutlookThread
+from luxstatus.sources.session import SessionSource
 from luxstatus.state import Resolution, SourceUpdate, Status
 
 if TYPE_CHECKING:
@@ -48,6 +50,8 @@ def default_pollers(cfg: Config) -> list[Poller]:
     pollers = []
     if cfg.devices.enabled:
         pollers.append(Poller("devices", DevicesSource(cfg.devices).poll, cfg.devices.poll_seconds))
+    if cfg.session.enabled:
+        pollers.append(Poller("session", SessionSource().poll, cfg.session.poll_seconds))
     return pollers
 
 
@@ -150,16 +154,64 @@ def start_outlook(cfg: Config, post: Callable[[SourceUpdate], None]) -> OutlookT
     return thread
 
 
+def self_check() -> int:
+    """Import every runtime dependency; used by CI against the packaged exe."""
+    import hid  # noqa: F401
+    import psutil  # noqa: F401
+    import pystray._win32  # noqa: F401
+    import pythoncom  # noqa: F401
+    import win32com.client  # noqa: F401
+
+    from luxstatus.tray import icon_image
+
+    icon_image((0, 255, 0))
+    log.info("self-check passed")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m luxstatus")
-    parser.add_argument("--config", type=Path, default=Path("config.toml"))
+    parser = argparse.ArgumentParser(prog="luxstatus")
+    parser.add_argument("--config", type=Path, help="config file (default: see README)")
     parser.add_argument("--console", action="store_true", help="no tray icon; Ctrl+C quits")
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--install-startup", action="store_true", help="start at login")
+    parser.add_argument("--uninstall-startup", action="store_true", help="stop starting at login")
+    parser.add_argument("--check", action="store_true", help="verify dependencies and exit")
     args = parser.parse_args(argv)
 
     log_file = logs.setup(console=True, verbose=args.verbose)
-    cfg = config_mod.load(args.config)
-    log.info("config: %s", args.config.resolve() if args.config.exists() else "defaults")
+    if args.check:
+        try:
+            return self_check()
+        except Exception:
+            log.exception("self-check failed")
+            return 1
+    if args.install_startup or args.uninstall_startup:
+        from luxstatus import winapp
+
+        if args.install_startup:
+            log.info("start at login enabled: %s", winapp.install_startup())
+        else:
+            winapp.uninstall_startup()
+            log.info("start at login disabled")
+        return 0
+
+    if sys.platform == "win32":
+        from luxstatus import winapp
+
+        if not winapp.acquire_single_instance():
+            log.info("another luxstatus is already running; exiting")
+            if not args.console:
+                winapp.message_box("luxstatus is already running. Look for it in the tray.")
+            return 1
+
+    exe_dir = Path(sys.executable).parent if getattr(sys, "frozen", False) else None
+    config_path = config_mod.find_config(
+        args.config, os.environ.get("APPDATA"), Path.cwd(), exe_dir
+    )
+    cfg = config_mod.load(config_path)
+    found = config_path is not None and config_path.exists()
+    log.info("config: %s", config_path.resolve() if found else "built-in defaults")
     log.info("log file: %s", log_file)
 
     app = App(cfg, HidLight(cfg), default_pollers(cfg))

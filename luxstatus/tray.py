@@ -101,9 +101,28 @@ class Tray:
                 radio=True,
             ),
             Menu.SEPARATOR,
+            MenuItem("Start at login", self._toggle_startup, checked=lambda _i: self._startup()),
             MenuItem("Open log", lambda: self._open_file(self.log_file)),
             MenuItem("Quit", lambda icon, _item: icon.stop()),
         )
+
+    def _startup(self) -> bool:
+        from luxstatus import winapp
+
+        return winapp.startup_installed()
+
+    def _toggle_startup(self, icon: Any, _item: Any) -> None:
+        from luxstatus import winapp
+
+        try:
+            if winapp.startup_installed():
+                winapp.uninstall_startup()
+                log.info("start at login disabled")
+            else:
+                log.info("start at login enabled: %s", winapp.install_startup())
+        except Exception:
+            log.exception("could not change start at login")
+        icon.update_menu()
 
     def update(self, resolution: Resolution) -> None:
         """Called from the engine thread on every resolution change."""

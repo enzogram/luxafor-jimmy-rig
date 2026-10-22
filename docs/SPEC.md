@@ -213,7 +213,8 @@ auto = "<ctrl>+<alt>+a"
 
 ## Run at login
 
-- Build a single windowed exe with PyInstaller and put a shortcut to it in `shell:startup`.
+- Build a single windowed exe with PyInstaller (`scripts/build.ps1`) and put a shortcut to it in `shell:startup` (tray "Start at login" or `--install-startup`).
+- Config is read from `--config`, then `%APPDATA%\luxstatus\config.toml`, then `config.toml` in the working folder, then next to the exe; otherwise defaults.
 - Logs go to `%LOCALAPPDATA%\luxstatus\luxstatus.log` (rotating). A windowed exe has no console, so log only to the file and install a `sys.excepthook` that writes crashes to the log.
 
 ## Milestones
