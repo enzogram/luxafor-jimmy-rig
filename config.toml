@@ -1,0 +1,41 @@
+# luxstatus configuration. Every key is optional; missing keys use these defaults.
+
+[colours]
+available   = [0, 255, 0]
+tentative   = [255, 180, 0]
+busy        = [255, 0, 0]
+call        = [255, 0, 0]
+call_camera = [255, 0, 0]   # used only if devices.camera_distinct = true
+dnd         = [255, 0, 255]
+
+[work_hours]
+enabled = true
+days  = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+start = "07:30"
+end   = "17:00"
+
+[outlook]
+enabled = true
+poll_seconds = 30
+lookahead_minutes = 240
+
+[session]
+enabled = true
+poll_seconds = 2
+
+[devices]
+enabled = true
+poll_seconds = 2
+on_debounce_reads = 2
+off_debounce_seconds = 10
+camera_distinct = false
+include = ["MSTeams", "zoom", "webex", "chrome", "msedge", "firefox"]   # empty = any app
+exclude = []
+
+[hotkeys]
+dnd  = "<ctrl>+<alt>+d"
+auto = "<ctrl>+<alt>+a"
+
+[resolver]
+tick_seconds = 5
+stale_factor = 3
