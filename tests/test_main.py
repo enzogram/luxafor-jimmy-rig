@@ -1,8 +1,11 @@
 import asyncio
+import threading
+import time
 from dataclasses import replace
 
 from luxstatus.config import Config, DevicesConfig
-from luxstatus.main import Poller, default_pollers, poll_loop, run
+from luxstatus.engine import Engine
+from luxstatus.main import App, Poller, default_pollers, poll_loop, run
 from luxstatus.sources.devices import MICROPHONE, WEBCAM, DevicesSource
 from luxstatus.state import Source, SourceUpdate, Status
 from tests.fakes import FakeLight
@@ -57,9 +60,8 @@ def test_light_follows_a_call_end_to_end():
         def on_change(r):
             seen.append(r.status)
 
-        task = asyncio.create_task(
-            run(cfg, light, stop, [Poller("devices", devices.poll, 0.01)], on_change)
-        )
+        engine = Engine(cfg, light, on_change=on_change)
+        task = asyncio.create_task(run(engine, stop, [Poller("devices", devices.poll, 0.01)]))
 
         async def until(status):
             for _ in range(200):
@@ -79,3 +81,33 @@ def test_light_follows_a_call_end_to_end():
     asyncio.run(main())
     assert [r.status for r in light.shown] == [Status.AVAILABLE, Status.CALL, Status.AVAILABLE]
     assert light.shown[1].detail == "MSTeams (mic)"
+
+
+def wait_for(predicate, timeout=2.0):
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if predicate():
+            return
+        time.sleep(0.01)
+    raise AssertionError("condition not met")
+
+
+def test_app_threads_manual_override_from_other_threads_and_shuts_down():
+    light = FakeLight()
+    app = App(Config(), light, [])
+    seen = []
+    app.listeners.append(lambda r: seen.append(r.status))
+    app.listeners.append(lambda r: 1 / 0)  # a broken listener must not stop the engine
+    app.manual.set(Status.DND)  # posted before the loop starts: must not be lost
+    app.start()
+    wait_for(lambda: light.shown and light.shown[-1].status is Status.DND)
+
+    t = threading.Thread(target=app.manual.toggle_dnd)  # e.g. the hotkey thread
+    t.start()
+    t.join()
+    wait_for(lambda: app.manual.current() is None and len(seen) >= 2)
+
+    app.shutdown()
+    assert not app.thread.is_alive()
+    assert light.shown[-1].status is Status.OFF
+    assert Status.DND in seen

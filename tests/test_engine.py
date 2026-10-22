@@ -1,5 +1,4 @@
 import asyncio
-import threading
 from dataclasses import replace
 from datetime import datetime
 
@@ -47,16 +46,14 @@ def test_camera_change_rewrites_light():
     assert [r.camera for r in light.shown] == [False, True]
 
 
-def test_run_processes_updates_from_other_threads_and_stops():
+def test_run_sets_light_at_startup_processes_queue_and_stops():
     engine, light, changes = make()
 
     async def main():
         stop = asyncio.Event()
         task = asyncio.create_task(engine.run(stop))
         await asyncio.sleep(0.05)
-        t = threading.Thread(target=engine.post, args=(call(),))
-        t.start()
-        t.join()
+        engine.queue.put_nowait(call())
         for _ in range(100):
             if light.shown and light.shown[-1].status is Status.CALL:
                 break

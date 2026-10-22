@@ -37,13 +37,6 @@ class Engine:
         self.latest: dict[Source, SourceUpdate] = {}
         self.current: Resolution | None = None
         self.queue: asyncio.Queue[SourceUpdate] = asyncio.Queue()
-        self._loop: asyncio.AbstractEventLoop | None = None
-
-    def post(self, update: SourceUpdate) -> None:
-        """Submit an update from any thread (Outlook, hotkeys, tray callbacks)."""
-        if self._loop is None:
-            raise RuntimeError("engine is not running")
-        self._loop.call_soon_threadsafe(self.queue.put_nowait, update)
 
     def apply(self, update: SourceUpdate) -> None:
         self.latest[update.source] = update
@@ -56,9 +49,9 @@ class Engine:
             resolution.status,
             resolution.camera,
         ):
-            log.info("status %s", resolution.describe())
             self.light.show(resolution)
         if resolution != previous:
+            log.info("status %s", resolution.describe())
             self.current = resolution
             if self.on_change is not None:
                 self.on_change(resolution)
@@ -66,7 +59,7 @@ class Engine:
 
     async def run(self, stop: asyncio.Event) -> None:
         """Run until ``stop`` is set. Ticks happen on schedule even under a steady update stream."""
-        loop = self._loop = asyncio.get_running_loop()
+        loop = asyncio.get_running_loop()
         tick = self.config.resolver.tick_seconds
         next_tick = loop.time()
         stopper = asyncio.ensure_future(stop.wait())
@@ -92,4 +85,3 @@ class Engine:
                     self.step()
         finally:
             stopper.cancel()
-            self._loop = None

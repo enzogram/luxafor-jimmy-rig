@@ -20,4 +20,4 @@ jobs:
       - run: uv run pytest -q
       - name: Import Windows adapters
         if: runner.os == 'Windows'
-        run: uv run python -c "import hid, win32com.client, pythoncom, pystray, psutil, winreg, luxstatus.probe"
+        run: uv run python -c "import hid, win32com.client, pythoncom, pystray, psutil, winreg, luxstatus.probe, luxstatus.tray, luxstatus.hotkeys, luxstatus.main"

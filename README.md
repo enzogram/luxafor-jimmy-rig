@@ -4,7 +4,7 @@ Drives a Luxafor Flag from your Outlook calendar, microphone/camera use and a ma
 
 ## Status
 
-Milestones 0–2 (probe, core logic, light driver) are done. Milestone 3 runs the app headless in a console with mic/camera detection only; it is awaiting a Teams call test. Outlook, tray, hotkeys and lock detection come next.
+Milestones 0–3 are done: the app follows Teams/Zoom calls. Milestone 4 (tray, manual override, hotkeys) is written and awaiting a manual check. Outlook and lock detection come next.
 
 ## Development
 
@@ -41,11 +41,17 @@ uv run python -m luxstatus.light dnd --watch       # hold the colour; Ctrl+C tur
 
 With `--watch`, unplug the Flag and plug it back in: the colour should return within about 5 seconds.
 
-## Run (milestone 3, console)
+## Run
 
 ```powershell
-uv run python -m luxstatus          # Ctrl+C quits and turns the light off
-uv run python -m luxstatus -v       # debug logging
+uv run python -m luxstatus             # tray icon; right-click for the menu
+uv run python -m luxstatus --console   # no tray; Ctrl+C quits
+uv run python -m luxstatus -v          # debug logging
 ```
 
-Each status change prints a line such as `17:42:10  CALL — MSTeams (mic + camera)`. A call shows at any time of day; otherwise the light is off outside work hours (Mon–Fri 07:30–17:00 by default; set `[work_hours] enabled = false` in `config.toml` to test in the evening).
+- The tray icon matches the light; hover for the reason, e.g. `CALL — MSTeams (mic + camera)`.
+- Menu: Auto, Do not disturb (30 minutes / 1 hour / Until cleared), Available, Off, Open log, Quit. Quit turns the light off.
+- Hotkeys: `Ctrl+Alt+D` toggles DND, `Ctrl+Alt+A` returns to Auto (change them under `[hotkeys]`).
+- Logs: `%LOCALAPPDATA%\luxstatus\luxstatus.log`.
+
+A call shows at any time of day; otherwise the light is off outside work hours (Mon–Fri 07:30–17:00 by default; adjust under `[work_hours]`, or set `enabled = false` there to test in the evening). Manual overrides apply at any time.

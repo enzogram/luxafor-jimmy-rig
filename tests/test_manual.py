@@ -44,3 +44,19 @@ def test_toggle_after_expired_dnd_sets_dnd_again():
 def test_rejects_non_manual_statuses(status):
     with pytest.raises(ValueError):
         ManualOverride().set(status, NOW)
+
+
+def test_manual_control_posts_each_action():
+    from luxstatus.sources.manual import ManualControl
+
+    posted = []
+    now = [NOW]
+    mc = ManualControl(posted.append, clock=lambda: now[0])
+    mc.set(Status.DND, timedelta(minutes=30))
+    assert mc.current() is Status.DND
+    now[0] = NOW + timedelta(minutes=31)
+    assert mc.current() is None  # expired shows as Auto in the menu
+    mc.toggle_dnd()
+    mc.auto()
+    assert [u.status for u in posted] == [Status.DND, Status.DND, None]
+    assert posted[0].until == NOW + timedelta(minutes=30)
