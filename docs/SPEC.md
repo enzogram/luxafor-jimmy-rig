@@ -26,7 +26,7 @@ Local Python service that drives a Luxafor Flag from three signals: Outlook cale
 
 - HID: one interface, `LUXAFOR FLAG`, usage page `0xFF00`; 9-byte static-colour reports are accepted.
 - Registry: new Teams is the packaged key `MSTeams_8wekyb3d8bbwe` under both `microphone` and `webcam`. During a test call both showed `LastUsedTimeStop = 0`, and the devices source reported `CALL — MSTeams (mic + camera)`.
-- Outlook: classic Outlook is running, locale `English_United States`. The `Restrict` filter ran without error but the window had no items, so the date format and item times are not confirmed yet.
+- Outlook: classic Outlook is running, locale `English_United States`. The `Restrict` filter (`MM/dd/yyyy hh:mm AM/PM`) returned the next day's items correctly, and item times came through as local wall-clock times once the tzinfo is stripped. A Free item (`Enter Time Sheet`) is dropped as intended.
 
 ## Architecture
 
