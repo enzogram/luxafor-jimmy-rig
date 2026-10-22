@@ -4,7 +4,7 @@ Drives a Luxafor Flag from your Outlook calendar, microphone/camera use and a ma
 
 ## Status
 
-Milestones 0 (probe) and 1 (core logic) are done; milestone 2 (light driver) is written and awaiting a hardware test. The full app is not runnable yet.
+Milestones 0–2 (probe, core logic, light driver) are done. Milestone 3 runs the app headless in a console with mic/camera detection only; it is awaiting a Teams call test. Outlook, tray, hotkeys and lock detection come next.
 
 ## Development
 
@@ -40,3 +40,12 @@ uv run python -m luxstatus.light dnd --watch       # hold the colour; Ctrl+C tur
 ```
 
 With `--watch`, unplug the Flag and plug it back in: the colour should return within about 5 seconds.
+
+## Run (milestone 3, console)
+
+```powershell
+uv run python -m luxstatus          # Ctrl+C quits and turns the light off
+uv run python -m luxstatus -v       # debug logging
+```
+
+Each status change prints a line such as `17:42:10  CALL — MSTeams (mic + camera)`. A call shows at any time of day; otherwise the light is off outside work hours (Mon–Fri 07:30–17:00 by default; set `[work_hours] enabled = false` in `config.toml` to test in the evening).
