@@ -25,6 +25,7 @@ from luxstatus.engine import Engine, Light
 from luxstatus.light import HidLight
 from luxstatus.sources.devices import DevicesSource
 from luxstatus.sources.manual import ManualControl
+from luxstatus.sources.outlook import OutlookThread
 from luxstatus.state import Resolution, SourceUpdate, Status
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ log = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class Poller:
     """A source polled from the asyncio loop. ``poll`` runs in a worker thread, so it must not
-    hold thread-bound resources (Outlook gets its own thread in milestone 5)."""
+    hold thread-bound resources (Outlook has its own thread)."""
 
     name: str
     poll: Callable[[datetime], SourceUpdate]
@@ -141,6 +142,14 @@ def start_hotkeys(cfg: Config, manual: ManualControl) -> HotkeyThread | None:
     return thread
 
 
+def start_outlook(cfg: Config, post: Callable[[SourceUpdate], None]) -> OutlookThread | None:
+    if not cfg.outlook.enabled or sys.platform != "win32":
+        return None
+    thread = OutlookThread(cfg.outlook, post)
+    thread.start()
+    return thread
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m luxstatus")
     parser.add_argument("--config", type=Path, default=Path("config.toml"))
@@ -155,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
 
     app = App(cfg, HidLight(cfg), default_pollers(cfg))
     hotkeys = start_hotkeys(cfg, app.manual)
+    outlook = start_outlook(cfg, app.post)
     try:
         if args.console:
             app.start()
@@ -173,6 +183,8 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if hotkeys is not None:
             hotkeys.stop()
+        if outlook is not None:
+            outlook.stop()
         app.shutdown()
         log.info("stopped")
     return 0

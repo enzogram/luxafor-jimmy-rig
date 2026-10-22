@@ -1,17 +1,23 @@
 """Outlook calendar via classic Outlook's COM object model.
 
 ``to_blocks`` and ``restrict_filter`` are pure. ``OutlookClient`` holds COM objects and must
-be created, used and dropped on one thread that has called ``pythoncom.CoInitialize()``.
+be created, used and dropped on one thread that has called ``pythoncom.CoInitialize()``;
+``OutlookThread`` is that thread.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import logging
+import threading
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, Protocol
 
-from luxstatus.state import OL_FREE, CalendarBlock
+from luxstatus.config import OutlookConfig
+from luxstatus.state import OL_FREE, CalendarBlock, Source, SourceUpdate
+
+log = logging.getLogger(__name__)
 
 OL_FOLDER_CALENDAR = 9
 # OlMeetingStatus: olMeetingCanceled, olMeetingReceivedAndCanceled.
@@ -99,3 +105,83 @@ class OutlookClient:
             )
             item = restricted.GetNext()
         return result
+
+
+class CalendarClient(Protocol):
+    def fetch(self, start: datetime, end: datetime) -> list[CalendarItem] | None: ...
+    def reset(self) -> None: ...
+
+
+class OutlookThread(threading.Thread):
+    """Polls the calendar on its own thread and posts the look-ahead blocks.
+
+    When Outlook is not running nothing is posted, so the last report goes stale and the
+    resolver treats the calendar as unknown. A COM error (Outlook restarted, sleep/resume)
+    drops the cached objects and retries once with a fresh connection.
+    """
+
+    def __init__(
+        self,
+        config: OutlookConfig,
+        post: Callable[[SourceUpdate], None],
+        client: CalendarClient | None = None,
+        clock: Callable[[], datetime] = datetime.now,
+        com: bool = True,
+    ) -> None:
+        super().__init__(name="outlook", daemon=True)
+        self.config = config
+        self.post = post
+        self.client = client or OutlookClient()
+        self.clock = clock
+        self.com = com
+        self._stop_event = threading.Event()
+        self._failing = False
+        self._running: bool | None = None
+
+    def run(self) -> None:
+        if self.com:
+            import pythoncom
+
+            pythoncom.CoInitialize()
+        try:
+            while not self._stop_event.is_set():
+                self.poll_once()
+                self._stop_event.wait(self.config.poll_seconds)
+        finally:
+            self.client.reset()  # release COM objects on this thread
+            if self.com:
+                pythoncom.CoUninitialize()
+
+    def stop(self, timeout: float = 5) -> None:
+        self._stop_event.set()
+        if self.is_alive():
+            self.join(timeout)
+
+    def poll_once(self) -> SourceUpdate | None:
+        now = self.clock()
+        end = now + timedelta(minutes=self.config.lookahead_minutes)
+        items = None
+        for attempt in (1, 2):
+            try:
+                items = self.client.fetch(now, end)
+                break
+            except Exception:
+                self.client.reset()
+                if attempt == 2:
+                    if not self._failing:
+                        log.exception("Outlook read failed; will keep retrying")
+                    self._failing = True
+                    return None
+        if self._failing:
+            log.info("Outlook read recovered")
+            self._failing = False
+
+        running = items is not None
+        if running != self._running:
+            log.info("Outlook %s", "connected" if running else "not running; calendar unknown")
+            self._running = running
+        if items is None:
+            return None
+        update = SourceUpdate(Source.OUTLOOK, now, blocks=to_blocks(items))
+        self.post(update)
+        return update

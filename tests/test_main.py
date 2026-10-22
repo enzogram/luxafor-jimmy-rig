@@ -111,3 +111,34 @@ def test_app_threads_manual_override_from_other_threads_and_shuts_down():
     assert not app.thread.is_alive()
     assert light.shown[-1].status is Status.OFF
     assert Status.DND in seen
+
+
+def test_outlook_thread_drives_light_through_app():
+    from datetime import datetime, timedelta
+
+    from luxstatus.config import OutlookConfig
+    from luxstatus.sources.outlook import CalendarItem, OutlookThread
+    from luxstatus.state import OL_BUSY
+
+    now = datetime.now()
+    meeting = CalendarItem(now - timedelta(minutes=5), now + timedelta(minutes=30), OL_BUSY, "Sync")
+
+    class Client:
+        def fetch(self, start, end):
+            return [meeting]
+
+        def reset(self):
+            pass
+
+    cfg = replace(Config(), work_hours=replace(Config().work_hours, enabled=False))
+    light = FakeLight()
+    app = App(cfg, light, [])
+    outlook = OutlookThread(OutlookConfig(poll_seconds=60), app.post, client=Client(), com=False)
+    app.start()
+    outlook.start()
+    try:
+        wait_for(lambda: light.shown and light.shown[-1].status is Status.BUSY)
+        assert light.shown[-1].detail.startswith("Outlook: Sync until ")
+    finally:
+        outlook.stop()
+        app.shutdown()

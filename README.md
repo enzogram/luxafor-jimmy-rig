@@ -4,7 +4,7 @@ Drives a Luxafor Flag from your Outlook calendar, microphone/camera use and a ma
 
 ## Status
 
-Milestones 0–3 are done: the app follows Teams calls. Milestone 4 (tray, manual override, hotkeys) is written and awaiting a manual check. Outlook and lock detection come next.
+Milestones 0–4 are done: the app follows Teams calls and has a tray menu and hotkeys. Milestone 5 (Outlook calendar) is written and awaiting a check against a real meeting. Lock detection, single-instance and the PyInstaller build come next.
 
 ## Development
 
@@ -49,7 +49,8 @@ uv run python -m luxstatus --console   # no tray; Ctrl+C quits
 uv run python -m luxstatus -v          # debug logging
 ```
 
-- The tray icon matches the light; hover for the reason, e.g. `CALL — MSTeams (mic + camera)`.
+- The tray icon matches the light; hover for the reason, e.g. `CALL — MSTeams (mic + camera)` or `BUSY — Outlook: Weekly sync until 14:30`.
+- Outlook: Busy/Out of office meetings show red, Tentative amber; Free and Working elsewhere are ignored. Classic Outlook must be running; if it is closed, the calendar is ignored after about 90 s.
 - Menu: Auto, Do not disturb (30 minutes / 1 hour / Until cleared), Available, Off, Open log, Quit. Quit turns the light off.
 - Hotkeys: `Ctrl+Alt+D` toggles DND, `Ctrl+Alt+A` returns to Auto (change them under `[hotkeys]`).
 - Logs: `%LOCALAPPDATA%\luxstatus\luxstatus.log`.

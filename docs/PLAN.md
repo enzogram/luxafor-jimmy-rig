@@ -15,8 +15,8 @@ CI runs the unit tests on both `ubuntu-latest` and `windows-latest`. The Windows
 | 1 ✅ | **Core** — config, `Status`/`SourceUpdate`, pure resolver (priority, staleness, expiry), engine loop with a fake light, debouncer, registry-tree and calendar logic, manual override. | `uv run pytest` |
 | 2 ✅ | **Light driver + CLI** — `python -m luxstatus.light busy`; rewrites the colour every tick and reconnects after unplug/replug. | Hardware (replug tested) |
 | 3 ✅ | **Devices source** — `winreg` poller, process check, wired into the engine. | Teams call |
-| 4 🔶 | **Tray + manual override + hotkeys** — pystray on the main thread, engine on a worker thread, `RegisterHotKey` thread. Also brings forward rotating file logging (for "Open log"). | Code done; needs a manual check |
-| 5 | **Outlook source** — dedicated COM thread with look-ahead fetch. | Classic Outlook |
+| 4 ✅ | **Tray + manual override + hotkeys** — pystray on the main thread, engine on a worker thread, `RegisterHotKey` thread. Also brings forward rotating file logging (for "Open log"). | Manual check |
+| 5 🔶 | **Outlook source** — dedicated COM thread with look-ahead fetch; reconnects after COM errors. | Code done; needs a real meeting |
 | 6 | **Session lock, work hours, single-instance mutex, logging, PyInstaller build, startup shortcut.** | Manual |
 | 7 | **Polish** — call-start strobe, tooltip reasons, config reload without restart. | Manual |
 
