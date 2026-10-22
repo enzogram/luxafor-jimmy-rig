@@ -4,7 +4,7 @@ Drives a Luxafor Flag from your Outlook calendar, microphone/camera use and a ma
 
 ## Status
 
-Milestones 0–3 are done: the app follows Teams/Zoom calls. Milestone 4 (tray, manual override, hotkeys) is written and awaiting a manual check. Outlook and lock detection come next.
+Milestones 0–3 are done: the app follows Teams calls. Milestone 4 (tray, manual override, hotkeys) is written and awaiting a manual check. Outlook and lock detection come next.
 
 ## Development
 
