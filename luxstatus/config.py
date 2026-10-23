@@ -66,6 +66,14 @@ class Hotkeys:
 
 
 @dataclass(frozen=True)
+class EffectsConfig:
+    call_flash: bool = True  # strobe briefly when a call starts, then hold solid
+    flash_seconds: float = 2
+    flash_speed: int = 20  # Luxafor strobe speed byte; lower is faster
+    flash_repeat: int = 3
+
+
+@dataclass(frozen=True)
 class ResolverConfig:
     tick_seconds: float = 5
     stale_factor: float = 3
@@ -79,6 +87,7 @@ class Config:
     session: SessionConfig = field(default_factory=SessionConfig)
     devices: DevicesConfig = field(default_factory=DevicesConfig)
     hotkeys: Hotkeys = field(default_factory=Hotkeys)
+    effects: EffectsConfig = field(default_factory=EffectsConfig)
     resolver: ResolverConfig = field(default_factory=ResolverConfig)
 
 
@@ -129,6 +138,7 @@ def from_dict(data: dict[str, Any]) -> Config:
         session=_section(cfg.session, data.get("session", {}), "session"),
         devices=_section(cfg.devices, data.get("devices", {}), "devices"),
         hotkeys=_section(cfg.hotkeys, data.get("hotkeys", {}), "hotkeys"),
+        effects=_section(cfg.effects, data.get("effects", {}), "effects"),
         resolver=_section(cfg.resolver, data.get("resolver", {}), "resolver"),
     )
 

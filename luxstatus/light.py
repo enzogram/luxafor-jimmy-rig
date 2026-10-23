@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -81,19 +82,42 @@ def open_flag() -> HidDevice:
     return dev
 
 
+Scheduler = Callable[[float, Callable[[], None]], None]
+
+
+def _timer(delay: float, fn: Callable[[], None]) -> None:
+    t = threading.Timer(delay, fn)
+    t.daemon = True
+    t.start()
+
+
 class HidLight:
     """Keeps the Flag showing the wanted colour.
 
     Every ``tick`` rewrites the colour. After an unplug/replug or sleep the Flag comes back
     dark and the old handle can still look open, so a failing write is the only reliable
     signal. A failed write closes the handle and retries once with a fresh one.
+
+    When a call starts it strobes for ``effects.flash_seconds``, then a timer restores the
+    solid colour. Ticks skip rewriting during the flash so they don't cut it short. Writes come
+    from the engine thread and the timer thread, so they are serialised with a lock.
     """
 
-    def __init__(self, config: Config, open_device: Callable[[], HidDevice] = open_flag) -> None:
+    def __init__(
+        self,
+        config: Config,
+        open_device: Callable[[], HidDevice] = open_flag,
+        schedule: Scheduler = _timer,
+    ) -> None:
         self.config = config
         self._open_device = open_device
+        self._schedule = schedule
         self._dev: HidDevice | None = None
         self._warned_missing = False
+        self._lock = threading.RLock()
+        self._status: Status | None = None
+        self._flash_id = 0  # bumped on every show; a stale restore timer does nothing
+        self._flashing = False
         self.colour: RGB | None = None
 
     @property
@@ -101,32 +125,58 @@ class HidLight:
         return self._dev is not None
 
     def show(self, resolution: Resolution) -> None:
-        self.set_rgb(colour_for(resolution, self.config))
+        rgb = colour_for(resolution, self.config)
+        fx = self.config.effects
+        with self._lock:
+            starting_call = resolution.status is Status.CALL and self._status is not Status.CALL
+            self._status = resolution.status
+            self._flash_id += 1
+            self._flashing = False
+            self.colour = rgb
+            if starting_call and fx.call_flash and rgb != OFF:
+                if self._send(strobe_report(rgb, fx.flash_speed, fx.flash_repeat)):
+                    self._flashing = True
+                    flash_id = self._flash_id
+                    self._schedule(fx.flash_seconds, lambda: self._end_flash(flash_id))
+                    return
+            self._send(static_report(rgb))
 
     def set_rgb(self, rgb: RGB) -> bool:
-        self.colour = rgb
-        return self._write()
+        with self._lock:
+            self._flash_id += 1
+            self._flashing = False
+            self._status = None
+            self.colour = rgb
+            return self._send(static_report(rgb))
 
     def tick(self) -> None:
-        if self.colour is not None:
-            self._write()
+        with self._lock:
+            if self.colour is not None and not self._flashing:
+                self._send(static_report(self.colour))
 
     def close(self) -> None:
-        if self._dev is not None:
-            try:
-                self._dev.close()
-            except OSError:
-                pass
-            self._dev = None
+        with self._lock:
+            if self._dev is not None:
+                try:
+                    self._dev.close()
+                except OSError:
+                    pass
+                self._dev = None
 
-    def _write(self) -> bool:
-        assert self.colour is not None
+    def _end_flash(self, flash_id: int) -> None:
+        with self._lock:
+            if flash_id != self._flash_id or self.colour is None:
+                return  # status changed since this flash started
+            self._flashing = False
+            self._send(static_report(self.colour))
+
+    def _send(self, report: bytes) -> bool:
         for _ in range(2):
             if self._dev is None and not self._connect():
                 return False
             assert self._dev is not None
             try:
-                if self._dev.write(static_report(self.colour)) >= 0:
+                if self._dev.write(report) >= 0:
                     return True
                 log.warning("Flag write failed; reconnecting")
             except (OSError, ValueError) as e:
