@@ -47,12 +47,16 @@ def test_nothing_reported_is_available():
 def test_outside_work_hours_is_off():
     assert status_of(now=EVENING) is Status.OFF
     assert status_of(now=SATURDAY) is Status.OFF
-    assert (
-        status_of(
-            outlook(block(OL_BUSY, start=EVENING, end=EVENING + timedelta(hours=1))), now=EVENING
-        )
-        is Status.OFF
-    )
+
+
+def test_meeting_outside_work_hours_still_shows():
+    evening = block(OL_BUSY, start=EVENING, end=EVENING + timedelta(hours=1))
+    assert status_of(outlook(evening, ts=EVENING), now=EVENING) is Status.BUSY
+    early = block(OL_TENTATIVE, start=SATURDAY, end=SATURDAY + timedelta(hours=1))
+    assert status_of(outlook(early, ts=SATURDAY), now=SATURDAY) is Status.TENTATIVE
+    # Working elsewhere outside hours is still just "off".
+    elsewhere = block(OL_WORKING_ELSEWHERE, start=EVENING, end=EVENING + timedelta(hours=1))
+    assert status_of(outlook(elsewhere, ts=EVENING), now=EVENING) is Status.OFF
 
 
 @pytest.mark.parametrize("status", [Status.DND, Status.AVAILABLE, Status.OFF])

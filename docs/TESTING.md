@@ -23,7 +23,7 @@ Send this file's checklist with each item marked pass or fail, plus a note on an
 
 ## Milestone 5 — Outlook calendar
 
-Run `uv run python -m luxstatus` or the exe. After 17:00, set `enabled = false` under `[work_hours]` first.
+Run `uv run python -m luxstatus` or the exe. Meetings show at any hour, so no config change is needed after 17:00.
 
 - [ ] A test appointment covering now, shown as **Busy**, turns the light red within ~30 s; the tooltip reads `BUSY — Outlook: <subject> until HH:MM`.
 - [ ] Changing it to **Tentative** turns the light amber within ~30 s.

@@ -92,15 +92,17 @@ def resolve(latest: Mapping[Source, SourceUpdate], now: datetime, config: Config
     if devices and devices.status is Status.CALL:
         return Resolution(Status.CALL, Source.DEVICES, devices.detail, devices.camera)
 
-    if not in_work_hours(now, config.work_hours):
-        return Resolution(Status.OFF, None, "Outside work hours")
-
+    # Like a call, a Busy/Tentative meeting shows at any hour: work hours only decide whether
+    # an empty calendar means AVAILABLE or OFF.
     outlook = fresh.get(Source.OUTLOOK)
     if outlook:
         status, block = calendar_status(outlook.blocks, now)
         if status is not None and block is not None:
             detail = f"Outlook: {block.subject or '(no subject)'} until {block.end:%H:%M}"
             return Resolution(status, Source.OUTLOOK, detail)
+
+    if not in_work_hours(now, config.work_hours):
+        return Resolution(Status.OFF, None, "Outside work hours")
 
     return Resolution(Status.AVAILABLE)
 

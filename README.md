@@ -15,9 +15,9 @@ Highest priority first:
 | Manual override from the tray or a hotkey | DND magenta, Available green, Off |
 | Screen locked | Off (even during a call) |
 | Mic or camera in use by Teams, Zoom, Webex or a browser | Red |
+| Outlook meeting marked Busy or Out of office (at any hour) | Red |
+| Outlook meeting marked Tentative (at any hour) | Amber |
 | Outside work hours (Mon–Fri 07:30–17:00 by default) | Off |
-| Outlook meeting marked Busy or Out of office | Red |
-| Outlook meeting marked Tentative | Amber |
 | Otherwise | Green |
 
 Classic Outlook must be running for the calendar to count; if it is closed, the calendar is ignored after about 90 s.

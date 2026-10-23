@@ -77,8 +77,8 @@ class Status(Enum):
 1. Manual override, if set and not expired. Can be DND, AVAILABLE, or OFF. Manual OFF replaces the separate "Pause light" idea.
 2. Session locked → OFF, even during a call.
 3. Devices: CALL. A live call overrides work hours, so evening calls still show.
-4. Outside work hours → OFF.
-5. Outlook: BUSY (BusyStatus 2 or 3) > TENTATIVE (1). Working Elsewhere (4) counts as AVAILABLE.
+4. Outlook: BUSY (BusyStatus 2 or 3) > TENTATIVE (1). Working Elsewhere (4) counts as AVAILABLE. Like a call, a meeting shows outside work hours too.
+5. Outside work hours → OFF.
 6. AVAILABLE.
 
 The resolver is a pure function of the latest update from each source, the current time and the config. Stateful logic (debounce, override bookkeeping) lives in the sources.
