@@ -114,3 +114,18 @@ def test_thread_polls_and_stops_promptly():
     assert time.monotonic() - started < 1  # does not wait out the 60 s poll interval
     assert len(posted) == 1
     assert client.resets >= 1  # COM objects released on the thread
+
+
+def test_restrict_filter_uses_given_formatter():
+    f = restrict_filter(T, T + H, fmt=lambda dt: dt.strftime("%d/%m/%Y %H:%M"))
+    assert f == "[Start] < '21/10/2026 10:00' AND [End] > '21/10/2026 09:00'"
+
+
+def test_outlook_datetime_falls_back_to_us_order_off_windows(monkeypatch):
+    from luxstatus.sources import outlook
+
+    def broken(dt):
+        raise ImportError("no win32api")
+
+    monkeypatch.setattr(outlook, "locale_datetime", broken)
+    assert outlook.outlook_datetime(T) == "10/21/2026 09:00 AM"
