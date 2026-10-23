@@ -22,3 +22,12 @@ Build with `./scripts/build.ps1` (or download `luxstatus-exe` from CI) and copy 
 - [ ] Win+L turns the light off within ~2 s; unlocking restores it.
 - [ ] Ticking "Start at login", then signing out and back in, starts the app automatically.
 - [ ] Unticking it removes the shortcut (`shell:startup` no longer has `luxstatus.lnk`).
+
+## Milestone 7 — polish
+
+- [ ] When a call starts, the light strobes for about 2 s, then stays solid red. If the strobe looks wrong (too fast, too long, ends dark), note what you saw; `flash_speed`, `flash_repeat` and `flash_seconds` under `[effects]` tune it.
+- [ ] Camera on/off during a call does not re-trigger the flash.
+- [ ] Tray → **Open config** opens `%APPDATA%\luxstatus\config.toml` (created from the template the first time).
+- [ ] Changing `busy` under `[colours]` and saving recolours the light and tray icon within ~2 s during a Busy meeting, with no restart.
+- [ ] Saving a broken file (e.g. delete a `]`) shows a tray notification and the light keeps working; fixing it applies the new settings.
+- [ ] Changing a hotkey under `[hotkeys]` takes effect without a restart.

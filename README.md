@@ -4,7 +4,7 @@ Drives a Luxafor Flag from your Outlook calendar, microphone/camera use and a ma
 
 ## Status
 
-Milestones 0–4 are done: the app follows Teams calls and has a tray menu and hotkeys. Milestones 5 (Outlook) and 6 (lock detection, single instance, exe, start at login) are written and awaiting checks on the real machine. Milestone 7 is polish.
+All milestones are built. 0–4 are verified on the target machine; 5 (Outlook), 6 (exe, lock, single instance, start at login) and 7 (call flash, Open config, live reload) await the checks in [`docs/TESTING.md`](docs/TESTING.md).
 
 ## What the light shows
 
@@ -29,19 +29,20 @@ Classic Outlook must be running for the calendar to count; if it is closed, the 
    ./scripts/build.ps1          # produces dist\luxstatus.exe
    ```
 2. Copy `dist\luxstatus.exe` somewhere permanent, e.g. `%LOCALAPPDATA%\Programs\luxstatus\`.
-3. Optional: copy `config.toml` to `%APPDATA%\luxstatus\config.toml` and edit it. Every key is optional.
-4. Run the exe, right-click the tray icon and tick **Start at login**.
+3. Run the exe, right-click the tray icon and tick **Start at login**.
+4. Optional: right-click → **Open config** to edit settings. The first time, this creates `%APPDATA%\luxstatus\config.toml` from the commented template. Saved changes apply within a few seconds; a bad edit shows a notification and the previous settings stay.
 
 Only one copy runs at a time; starting a second one shows a message and exits.
 
 ## Use
 
 - The tray icon matches the light; hover for the reason, e.g. `CALL — MSTeams (mic + camera)` or `BUSY — Outlook: Weekly sync until 14:30`.
-- Menu: Auto, Do not disturb (30 minutes / 1 hour / Until cleared), Available, Off, Start at login, Open log, Quit. Quit turns the light off.
+- Menu: Auto, Do not disturb (30 minutes / 1 hour / Until cleared), Available, Off, Start at login, Open config, Open log, Quit. Quit turns the light off.
+- When a call starts the light flashes briefly, then stays solid (`[effects] call_flash = false` turns this off).
 - Hotkeys: `Ctrl+Alt+D` toggles DND, `Ctrl+Alt+A` returns to Auto (change them under `[hotkeys]`).
 - Logs: `%LOCALAPPDATA%\luxstatus\luxstatus.log`.
 
-Config is read from the first of: `--config PATH`, `%APPDATA%\luxstatus\config.toml`, `config.toml` in the current folder, `config.toml` next to the exe. Otherwise built-in defaults apply. The log says which file was used. Changes need a restart (Quit, then start it again).
+Config is read from the first of: `--config PATH`, `%APPDATA%\luxstatus\config.toml`, `config.toml` in the current folder, `config.toml` next to the exe. Otherwise built-in defaults apply. The log says which file was used. Changes are picked up without a restart, including a newly created `%APPDATA%` file.
 
 Command-line options: `--console` (no tray; Ctrl+C quits), `-v` (debug logging), `--install-startup` / `--uninstall-startup`, `--check` (verify dependencies and exit).
 

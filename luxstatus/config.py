@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import tomllib
 from dataclasses import dataclass, field, fields, replace
 from datetime import time
@@ -91,6 +92,17 @@ class Config:
     resolver: ResolverConfig = field(default_factory=ResolverConfig)
 
 
+def template_path() -> Path:
+    """The commented config.toml shipped with the app (bundled into the exe by build.ps1)."""
+    base = getattr(sys, "_MEIPASS", None)
+    root = Path(base) if base else Path(__file__).resolve().parent.parent
+    return root / "config.toml"
+
+
+def user_config_path(appdata: str) -> Path:
+    return Path(appdata) / "luxstatus" / "config.toml"
+
+
 def find_config(
     explicit: Path | None,
     appdata: str | None,
@@ -105,7 +117,7 @@ def find_config(
         return explicit
     candidates = []
     if appdata:
-        candidates.append(Path(appdata) / "luxstatus" / "config.toml")
+        candidates.append(user_config_path(appdata))
     candidates.append(cwd / "config.toml")
     if exe_dir is not None:
         candidates.append(exe_dir / "config.toml")

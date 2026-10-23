@@ -50,6 +50,7 @@ class Tray:
         manual: ManualControl,
         log_file: Path,
         open_file: Callable[[Path], None] | None = None,
+        open_config: Callable[[], None] | None = None,
     ) -> None:
         import pystray
 
@@ -57,6 +58,7 @@ class Tray:
         self.manual = manual
         self.log_file = log_file
         self._open_file = open_file or (lambda p: os.startfile(p))  # type: ignore[attr-defined]
+        self._open_config = open_config
         self._icon = pystray.Icon("luxstatus", icon_image(OFF), tooltip(None), self._menu())
 
     def _menu(self) -> Any:
@@ -102,6 +104,7 @@ class Tray:
             ),
             Menu.SEPARATOR,
             MenuItem("Start at login", self._toggle_startup, checked=lambda _i: self._startup()),
+            MenuItem("Open config", self._edit_config, visible=self._open_config is not None),
             MenuItem("Open log", lambda: self._open_file(self.log_file)),
             MenuItem("Quit", lambda icon, _item: icon.stop()),
         )
@@ -123,6 +126,21 @@ class Tray:
         except Exception:
             log.exception("could not change start at login")
         icon.update_menu()
+
+    def _edit_config(self) -> None:
+        try:
+            if self._open_config is not None:
+                self._open_config()
+        except Exception as e:
+            log.exception("could not open the config file")
+            self.notify(f"Could not open the config file: {e}")
+
+    def notify(self, message: str) -> None:
+        """A Windows notification from the tray icon; failures are only logged."""
+        try:
+            self._icon.notify(message, "luxstatus")
+        except Exception:
+            log.warning("tray notification failed: %s", message)
 
     def update(self, resolution: Resolution) -> None:
         """Called from the engine thread on every resolution change."""

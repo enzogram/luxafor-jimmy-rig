@@ -2,6 +2,7 @@ import asyncio
 import threading
 import time
 from dataclasses import replace
+from datetime import datetime
 
 from luxstatus.config import Config, DevicesConfig
 from luxstatus.engine import Engine
@@ -146,3 +147,83 @@ def test_outlook_thread_drives_light_through_app():
     finally:
         outlook.stop()
         app.shutdown()
+
+
+def test_app_reconfigure_rewrites_light_rebuilds_pollers_and_drops_disabled_sources():
+    light = FakeLight()
+    built = []
+
+    def make_pollers(cfg):
+        built.append(cfg)
+        return []
+
+    app = App(Config(), light, [], make_pollers=make_pollers)
+    app.post(SourceUpdate(Source.DEVICES, datetime.now(), Status.CALL, "MSTeams (mic)"))
+    app.start()
+    try:
+        wait_for(lambda: light.shown and light.shown[-1].status is Status.CALL)
+        shown = len(light.shown)
+        new = replace(Config(), devices=replace(Config().devices, enabled=False))
+        app.reconfigure(new)
+        wait_for(lambda: built == [new])
+        assert app.engine.config is new
+        assert Source.DEVICES not in app.engine.latest  # the call no longer counts
+        assert len(light.shown) > shown  # light rewritten after reload
+        assert light.shown[-1].status is not Status.CALL
+    finally:
+        app.shutdown()
+
+
+def test_source_pollers_keep_debounce_state_across_reload():
+    from luxstatus.main import SourcePollers
+
+    pollers = SourcePollers()
+    pollers(Config())
+    devices = pollers.devices
+    devices.debouncer.state = True  # mid-call
+    cfg = replace(Config(), devices=replace(Config().devices, on_debounce_reads=5))
+    [p, _] = pollers(cfg)
+    assert pollers.devices is devices and devices.debouncer.state
+    assert devices.debouncer.on_reads == 5
+    assert p.interval == cfg.devices.poll_seconds
+
+
+def test_runtime_apply_updates_app_and_tray():
+    from luxstatus.main import Runtime
+
+    class FakeApp:
+        manual = None
+        post = None
+
+        def __init__(self):
+            self.configs = []
+
+        def reconfigure(self, cfg):
+            self.configs.append(cfg)
+
+    class FakeTray:
+        config = None
+
+    app, tray = FakeApp(), FakeTray()
+    rt = Runtime(Config(), app, tray)
+    new = replace(Config(), colours=replace(Config().colours, busy=(1, 2, 3)))
+    rt.apply(new)
+    assert app.configs == [new] and tray.config is new and rt.cfg is new
+    rt.stop()
+
+
+def test_ensure_config_file(tmp_path):
+    from luxstatus.config import template_path
+    from luxstatus.main import ensure_config_file
+
+    existing = tmp_path / "mine.toml"
+    existing.write_text("")
+    assert ensure_config_file(existing, str(tmp_path), template_path()) == existing
+
+    created = ensure_config_file(None, str(tmp_path / "AppData"), template_path())
+    assert created == tmp_path / "AppData" / "luxstatus" / "config.toml"
+    assert created.read_text() == template_path().read_text()
+    created.write_text("# edited")
+    assert ensure_config_file(None, str(tmp_path / "AppData"), template_path()).read_text() == (
+        "# edited"
+    )  # never overwrites
