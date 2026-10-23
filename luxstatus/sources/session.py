@@ -17,8 +17,12 @@ DESKTOP_SWITCHDESKTOP = 0x0100
 
 def workstation_locked() -> bool:
     import ctypes
+    from ctypes import wintypes
 
     user32 = ctypes.windll.user32
+    user32.OpenInputDesktop.restype = wintypes.HANDLE
+    user32.SwitchDesktop.argtypes = [wintypes.HANDLE]
+    user32.CloseDesktop.argtypes = [wintypes.HANDLE]
     desktop = user32.OpenInputDesktop(0, False, DESKTOP_SWITCHDESKTOP)
     if not desktop:
         return True

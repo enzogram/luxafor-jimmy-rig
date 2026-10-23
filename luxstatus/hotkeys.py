@@ -83,9 +83,14 @@ class HotkeyThread(threading.Thread):
                 log.info("hotkey %s registered", text)
             else:
                 log.warning("hotkey %s is already in use by another app; skipped", text)
-        self._started.set()
 
         msg = wintypes.MSG()
+        # Make sure this thread has a message queue before stop() can post WM_QUIT to it,
+        # even when no hotkey was registered.
+        PM_NOREMOVE = 0x0000
+        user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, PM_NOREMOVE)
+        self._started.set()
+
         try:
             while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
                 if msg.message == WM_HOTKEY and msg.wParam in callbacks:

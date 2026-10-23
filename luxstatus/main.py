@@ -12,6 +12,7 @@ import asyncio
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import threading
 from collections.abc import Callable
@@ -139,21 +140,30 @@ class App:
     def start(self) -> None:
         self.thread.start()
 
-    def shutdown(self) -> None:
-        """Stop the engine thread, then leave the light off."""
+    def shutdown(self, timeout: float = 10) -> None:
+        """Stop the engine thread, then leave the light off. Also used when Windows signs out,
+        with a short timeout because the process may be killed soon after."""
         if self.thread.is_alive():
-            self.loop.call_soon_threadsafe(self.stop_event.set)
-            self.thread.join(timeout=10)
-        self.light.show(Resolution(Status.OFF))
-        close = getattr(self.light, "close", None)
-        if close is not None:
-            close()
+            try:
+                self.loop.call_soon_threadsafe(self.stop_event.set)
+            except RuntimeError:
+                pass  # the loop already closed
+            self.thread.join(timeout=timeout)
+        try:
+            self.light.show(Resolution(Status.OFF))
+        finally:
+            close = getattr(self.light, "close", None)
+            if close is not None:
+                close()
 
     def _apply_config(self, cfg: Config) -> None:
-        self.engine.config = cfg
+        old, self.engine.config = self.engine.config, cfg
         if hasattr(self.light, "config"):
             self.light.config = cfg  # type: ignore[attr-defined]
-        if self.make_pollers is not None:
+        # Only restart polling when its settings changed: a cancelled poll can still be running
+        # in its worker thread, and overlapping it with a new one double-counts debounce reads.
+        pollers_changed = (cfg.devices, cfg.session) != (old.devices, old.session)
+        if self.make_pollers is not None and pollers_changed:
             for task in self._poll_tasks:
                 task.cancel()
             self.pollers = self.make_pollers(cfg)
@@ -249,17 +259,22 @@ class Runtime:
 
     def apply(self, cfg: Config, _path: Path | None = None) -> None:
         old, self.cfg = self.cfg, cfg
-        self.app.reconfigure(cfg)
+        # Order matters: the tray must have the new colours before the engine repaints it, and
+        # the old Outlook thread must stop before the engine drops its blocks, or a last post
+        # could put a stale meeting back.
         if self.tray is not None:
             self.tray.config = cfg
+        outlook_changed = cfg.outlook != old.outlook
+        if outlook_changed and self.outlook is not None:
+            self.outlook.stop()
+            self.outlook = None
+        self.app.reconfigure(cfg)
+        if outlook_changed:
+            self.outlook = self._start_outlook(cfg, self.app.post)
         if cfg.hotkeys != old.hotkeys:
             if self.hotkeys is not None:
                 self.hotkeys.stop()
             self.hotkeys = self._start_hotkeys(cfg, self.app.manual)
-        if cfg.outlook != old.outlook:
-            if self.outlook is not None:
-                self.outlook.stop()
-            self.outlook = self._start_outlook(cfg, self.app.post)
 
     def stop(self) -> None:
         if self.hotkeys is not None:
@@ -328,6 +343,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if sys.platform == "win32":
+        # Importing pythoncom initialises COM on the importing thread. Do it here, on the main
+        # (tray) thread, before any other thread imports it: the "Start at login" shortcut is
+        # created through COM from tray menu callbacks.
+        import pythoncom  # noqa: F401
+
         from luxstatus import winapp
 
         if not winapp.acquire_single_instance():
@@ -350,7 +370,10 @@ def main(argv: list[str] | None = None) -> int:
 
     def open_config() -> None:
         path = ensure_config_file(locate(), appdata, config_mod.template_path())
-        os.startfile(path)  # type: ignore[attr-defined]
+        try:
+            os.startfile(path)  # type: ignore[attr-defined]
+        except OSError:  # no app associated with .toml
+            subprocess.Popen(["notepad.exe", str(path)])
 
     pollers = SourcePollers()
     app = App(cfg, HidLight(cfg), pollers(cfg), make_pollers=pollers)
@@ -358,7 +381,13 @@ def main(argv: list[str] | None = None) -> int:
     if not args.console:
         from luxstatus.tray import Tray
 
-        tray = Tray(cfg, app.manual, log_file, open_config=open_config)
+        tray = Tray(
+            cfg,
+            app.manual,
+            log_file,
+            open_config=open_config,
+            on_session_end=lambda: app.shutdown(timeout=2),
+        )
         app.listeners.append(tray.update)
     runtime = Runtime(cfg, app, tray)
     watcher = ConfigWatcher(
@@ -368,7 +397,7 @@ def main(argv: list[str] | None = None) -> int:
         app.start()
         watcher.start()
         if tray is not None:
-            tray.run()
+            tray.run(on_ready=lambda: app.engine.current and tray.update(app.engine.current))
         else:
             print("luxstatus running; Ctrl+C to quit.")
             while app.thread.is_alive():
