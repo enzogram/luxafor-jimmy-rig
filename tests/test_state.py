@@ -115,7 +115,7 @@ def test_call_carries_camera_flag():
     ("busy", "expected"),
     [
         (OL_BUSY, Status.BUSY),
-        (OL_OOF, Status.BUSY),
+        (OL_OOF, Status.OOF),
         (OL_TENTATIVE, Status.TENTATIVE),
         (OL_WORKING_ELSEWHERE, Status.AVAILABLE),
         (OL_FREE, Status.AVAILABLE),
@@ -169,3 +169,10 @@ def test_work_hours_disabled():
 
     cfg = replace(CFG, work_hours=replace(CFG.work_hours, enabled=False))
     assert resolve({}, EVENING, cfg).status is Status.AVAILABLE
+
+
+def test_overlapping_blocks_busy_beats_oof_beats_tentative():
+    s, b = calendar_status([block(OL_OOF, subject="away"), block(OL_BUSY, subject="m")], NOW)
+    assert (s, b.subject) == (Status.BUSY, "m")
+    s, b = calendar_status([block(OL_TENTATIVE, subject="t"), block(OL_OOF, subject="away")], NOW)
+    assert (s, b.subject) == (Status.OOF, "away")

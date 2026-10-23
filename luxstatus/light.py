@@ -51,6 +51,12 @@ def strobe_report(rgb: RGB, speed: int, repeat: int) -> bytes:
     return bytes([0x00, CMD_STROBE, ALL_LEDS, r, g, b, speed, 0, repeat])
 
 
+def dimmed(rgb: RGB, brightness: float) -> RGB:
+    """The Flag has no brightness command, so scale the colour instead."""
+    r, g, b = (round(c * brightness) for c in rgb)
+    return (r, g, b)
+
+
 def colour_for(resolution: Resolution, config: Config) -> RGB:
     c = config.colours
     match resolution.status:
@@ -60,6 +66,8 @@ def colour_for(resolution: Resolution, config: Config) -> RGB:
             return c.available
         case Status.TENTATIVE:
             return c.tentative
+        case Status.OOF:
+            return c.oof
         case Status.BUSY:
             return c.busy
         case Status.CALL:
@@ -125,7 +133,7 @@ class HidLight:
         return self._dev is not None
 
     def show(self, resolution: Resolution) -> None:
-        rgb = colour_for(resolution, self.config)
+        rgb = dimmed(colour_for(resolution, self.config), self.config.colours.brightness)
         fx = self.config.effects
         with self._lock:
             starting_call = resolution.status is Status.CALL and self._status is not Status.CALL

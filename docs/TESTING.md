@@ -52,3 +52,6 @@ Build with `./scripts/build.ps1` (or download `luxstatus-exe` from CI) and copy 
 - [ ] Changing `busy` under `[colours]` and saving recolours the light and tray icon within ~2 s during a Busy meeting, with no restart.
 - [ ] Saving a broken file (e.g. delete a `]`) shows a tray notification and the light keeps working; fixing it applies the new settings.
 - [ ] Changing a hotkey under `[hotkeys]` takes effect without a restart.
+- [ ] DND (Ctrl+Alt+D) shows red. If yours is still magenta, your `%APPDATA%\luxstatus\config.toml` predates the change: set `dnd = [255, 0, 0]` or delete the line.
+- [ ] `brightness = 0.3` under `[colours]` visibly dims the Flag within ~2 s; the tray icon stays full colour.
+- [ ] An Outlook entry marked **Out of office** covering now turns the light off (tooltip `OOF — Outlook: …`).

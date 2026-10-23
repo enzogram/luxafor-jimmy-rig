@@ -67,7 +67,8 @@ class Status(Enum):
     OFF        # outside work hours, screen locked, or user turned it off
     AVAILABLE
     TENTATIVE  # tentative calendar block
-    BUSY       # busy calendar block / OOF
+    OOF        # out-of-office calendar block (light off by default)
+    BUSY       # busy calendar block
     CALL       # mic (or camera) in use by a filtered app
     DND        # manual
 ```
@@ -77,7 +78,7 @@ class Status(Enum):
 1. Manual override, if set and not expired. Can be DND, AVAILABLE, or OFF. Manual OFF replaces the separate "Pause light" idea.
 2. Session locked → OFF, even during a call.
 3. Devices: CALL. A live call overrides work hours, so evening calls still show.
-4. Outlook: BUSY (BusyStatus 2 or 3) > TENTATIVE (1). Working Elsewhere (4) counts as AVAILABLE. Like a call, a meeting shows outside work hours too.
+4. Outlook: BUSY (BusyStatus 2) > OOF (3) > TENTATIVE (1). Working Elsewhere (4) counts as AVAILABLE. Like a call, a meeting shows outside work hours too.
 5. Outside work hours → OFF.
 6. AVAILABLE.
 

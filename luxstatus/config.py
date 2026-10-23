@@ -25,7 +25,9 @@ class Colours:
     busy: RGB = (255, 0, 0)
     call: RGB = (255, 0, 0)
     call_camera: RGB = (255, 0, 0)
-    dnd: RGB = (255, 0, 255)
+    dnd: RGB = (255, 0, 0)
+    oof: RGB = (0, 0, 0)  # off: nobody is at the desk to see it
+    brightness: float = 1.0  # scales every colour on the Flag (not the tray icon)
 
 
 @dataclass(frozen=True)
@@ -166,6 +168,7 @@ _RANGES: dict[str, tuple[float, float]] = {
     "flash_repeat": (0, 255),
     "tick_seconds": (0.1, 60),
     "stale_factor": (1, 100),
+    "brightness": (0.1, 1),
 }
 
 
@@ -214,7 +217,9 @@ def _typed(kind: str, value: Any, where: str) -> Any:
     raise ConfigError(f"{where} has an unsupported type {kind}")
 
 
-def _colour(value: Any, where: str) -> RGB:
+def _colour(value: Any, where: str) -> RGB | float:
+    if where.endswith(".brightness"):
+        return _typed("float", value, where)
     if (
         not isinstance(value, list)
         or len(value) != 3
