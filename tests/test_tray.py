@@ -41,3 +41,39 @@ def test_real_tray_builds_menu_and_updates(tmp_path):
     assert items["Do not disturb"].checked
     assert not items["Auto"].checked
     assert tray._icon.title == "luxstatus — DND — Manual"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="pystray win32 backend")
+def test_real_tray_allows_sign_out_and_turns_light_off(tmp_path):
+    from luxstatus.config import Config
+    from luxstatus.sources.manual import ManualControl
+    from luxstatus.tray import WM_ENDSESSION, WM_QUERYENDSESSION, Tray
+
+    ended = []
+    tray = Tray(
+        Config(),
+        ManualControl(lambda u: None),
+        tmp_path / "log.txt",
+        on_session_end=lambda: ended.append(True),
+    )
+    handlers = tray._icon._message_handlers
+    assert handlers[WM_QUERYENDSESSION](0, 0) == 1  # do not block sign-out
+    assert handlers[WM_ENDSESSION](0, 0) == 0 and ended == []  # cancelled: nothing to do
+    handlers[WM_ENDSESSION](1, 0)
+    assert ended == [True]
+
+
+def test_tooltip_fits_utf16_limit_with_emoji():
+    from luxstatus.tray import utf16_len
+
+    subject = "🎉" * 80  # each emoji is two UTF-16 units
+    text = tooltip(Resolution(Status.BUSY, detail=f"Outlook: {subject} until 14:30"))
+    assert utf16_len(text) <= TOOLTIP_MAX
+    assert text.endswith("…")
+
+
+def test_fit_leaves_short_text_alone():
+    from luxstatus.tray import fit
+
+    assert fit("short", 10) == "short"
+    assert fit("abcdefghij", 5) == "abcd…"

@@ -69,11 +69,12 @@ def test_light_follows_a_call_end_to_end():
         task = asyncio.create_task(run(engine, stop, [Poller("devices", devices.poll, 0.01)]))
 
         async def until(status):
-            for _ in range(200):
-                if light.shown and light.shown[-1].status is status:
-                    return
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + 2  # by time: Windows' coarse clock makes short sleeps instant
+            while not (light.shown and light.shown[-1].status is status):
+                if loop.time() > deadline:
+                    raise AssertionError(f"light never showed {status}")
                 await asyncio.sleep(0.01)
-            raise AssertionError(f"light never showed {status}")
 
         await until(Status.AVAILABLE)
         registry[MICROPHONE] = {"MSTeams_8wekyb3d8bbwe": LIVE}
@@ -188,58 +189,84 @@ def test_source_pollers_keep_debounce_state_across_reload():
     assert p.interval == cfg.devices.poll_seconds
 
 
-def test_runtime_apply_updates_app_tray_and_restarts_only_changed_threads():
+def test_runtime_apply_order_and_restarts_only_changed_threads():
     from luxstatus.main import Runtime
+
+    events = []
 
     class FakeApp:
         manual = None
         post = None
 
-        def __init__(self):
-            self.configs = []
-
         def reconfigure(self, cfg):
-            self.configs.append(cfg)
+            events.append(("reconfigure", tray.config is cfg))  # tray already updated?
 
     class FakeTray:
         config = None
 
     class Thread:
-        def __init__(self, kind, log):
-            self.kind, self.log = kind, log
-            log.append(("start", kind))
+        def __init__(self, kind):
+            self.kind = kind
+            events.append(("start", kind))
 
         def stop(self):
-            self.log.append(("stop", self.kind))
+            events.append(("stop", self.kind))
 
-    events = []
     app, tray = FakeApp(), FakeTray()
     rt = Runtime(
         Config(),
         app,
         tray,
-        hotkeys_factory=lambda cfg, manual: Thread("hotkeys", events),
-        outlook_factory=lambda cfg, post: Thread("outlook", events),
+        hotkeys_factory=lambda cfg, manual: Thread("hotkeys"),
+        outlook_factory=lambda cfg, post: Thread("outlook"),
     )
     assert events == [("start", "hotkeys"), ("start", "outlook")]
 
     events.clear()
     colours = replace(Config(), colours=replace(Config().colours, busy=(1, 2, 3)))
     rt.apply(colours)
-    assert app.configs == [colours] and tray.config is colours and rt.cfg is colours
-    assert events == []  # neither section changed
-
-    hotkeys = replace(colours, hotkeys=replace(colours.hotkeys, dnd="<ctrl>+<alt>+x"))
-    rt.apply(hotkeys)
-    assert events == [("stop", "hotkeys"), ("start", "hotkeys")]
+    assert events == [("reconfigure", True)]  # tray has new colours first; no restarts
+    assert rt.cfg is colours
 
     events.clear()
-    rt.apply(replace(hotkeys, outlook=replace(hotkeys.outlook, poll_seconds=60)))
-    assert events == [("stop", "outlook"), ("start", "outlook")]
+    hotkeys = replace(colours, hotkeys=replace(colours.hotkeys, dnd="<ctrl>+<alt>+x"))
+    rt.apply(hotkeys)
+    assert events == [("reconfigure", True), ("stop", "hotkeys"), ("start", "hotkeys")]
+
+    events.clear()
+    rt.apply(replace(hotkeys, outlook=replace(hotkeys.outlook, enabled=False)))
+    # The old Outlook thread stops before the engine drops its blocks.
+    assert events == [("stop", "outlook"), ("reconfigure", True), ("start", "outlook")]
 
     events.clear()
     rt.stop()
     assert events == [("stop", "hotkeys"), ("stop", "outlook")]
+
+
+def test_reload_leaves_pollers_alone_when_their_settings_are_unchanged():
+    built = []
+    app = App(Config(), FakeLight(), [], make_pollers=lambda cfg: built.append(cfg) or [])
+    app.start()
+    try:
+        colours = replace(Config(), colours=replace(Config().colours, busy=(1, 2, 3)))
+        app.reconfigure(colours)
+        wait_for(lambda: app.engine.config is colours)
+        assert built == []
+        devices = replace(colours, devices=replace(colours.devices, poll_seconds=3))
+        app.reconfigure(devices)
+        wait_for(lambda: built == [devices])
+    finally:
+        app.shutdown()
+
+
+def test_shutdown_twice_and_after_loop_closed_still_turns_light_off():
+    light = FakeLight()
+    app = App(Config(), light, [])
+    app.start()
+    wait_for(lambda: light.shown)
+    app.shutdown()
+    app.shutdown()  # e.g. session end, then main()'s finally
+    assert light.shown[-1].status is Status.OFF
 
 
 def test_ensure_config_file(tmp_path):

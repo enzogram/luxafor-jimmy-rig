@@ -20,7 +20,13 @@ from luxstatus.state import Resolution, Status
 
 log = logging.getLogger(__name__)
 
-TOOLTIP_MAX = 127  # Windows notification-area tooltip limit (NOTIFYICONDATAW.szTip)
+# NOTIFYICONDATAW buffer limits, in UTF-16 code units excluding the terminator. A longer
+# string makes ctypes raise, which can stop the tray icon from appearing at all.
+TOOLTIP_MAX = 127  # szTip
+NOTIFY_MAX = 255  # szInfo
+
+WM_QUERYENDSESSION = 0x0011
+WM_ENDSESSION = 0x0016
 
 
 def icon_image(rgb: RGB, size: int = 64) -> Any:
@@ -38,9 +44,22 @@ def icon_image(rgb: RGB, size: int = 64) -> Any:
     return img
 
 
+def utf16_len(text: str) -> int:
+    return len(text.encode("utf-16-le")) // 2
+
+
+def fit(text: str, limit: int) -> str:
+    """Shorten ``text`` to at most ``limit`` UTF-16 units, ending with an ellipsis if cut.
+    Emoji in a meeting subject take two units each, so ``len()`` is not enough."""
+    if utf16_len(text) <= limit:
+        return text
+    while utf16_len(text) > limit - 1:
+        text = text[:-1]
+    return text + "…"
+
+
 def tooltip(resolution: Resolution | None) -> str:
-    text = f"luxstatus — {resolution.describe() if resolution else 'starting'}"
-    return text if len(text) <= TOOLTIP_MAX else text[: TOOLTIP_MAX - 1] + "…"
+    return fit(f"luxstatus — {resolution.describe() if resolution else 'starting'}", TOOLTIP_MAX)
 
 
 class Tray:
@@ -51,6 +70,7 @@ class Tray:
         log_file: Path,
         open_file: Callable[[Path], None] | None = None,
         open_config: Callable[[], None] | None = None,
+        on_session_end: Callable[[], None] | None = None,
     ) -> None:
         import pystray
 
@@ -59,7 +79,15 @@ class Tray:
         self.log_file = log_file
         self._open_file = open_file or (lambda p: os.startfile(p))  # type: ignore[attr-defined]
         self._open_config = open_config
+        self._on_session_end = on_session_end
         self._icon = pystray.Icon("luxstatus", icon_image(OFF), tooltip(None), self._menu())
+        # pystray's hidden window answers unhandled messages with 0. For WM_QUERYENDSESSION
+        # that means "block sign-out/shutdown", and WM_ENDSESSION is ignored so the light is
+        # left on. Hook both (private API of the win32 backend; pystray is pinned in uv.lock).
+        handlers = getattr(self._icon, "_message_handlers", None)
+        if handlers is not None:
+            handlers[WM_QUERYENDSESSION] = lambda _w, _l: 1
+            handlers[WM_ENDSESSION] = self._session_ending
 
     def _menu(self) -> Any:
         from pystray import Menu, MenuItem
@@ -135,10 +163,17 @@ class Tray:
             log.exception("could not open the config file")
             self.notify(f"Could not open the config file: {e}")
 
+    def _session_ending(self, wparam: int, _lparam: int) -> int:
+        """Windows is signing out or shutting down; the process may be killed on return."""
+        if wparam and self._on_session_end is not None:
+            log.info("session ending")
+            self._on_session_end()
+        return 0
+
     def notify(self, message: str) -> None:
         """A Windows notification from the tray icon; failures are only logged."""
         try:
-            self._icon.notify(message, "luxstatus")
+            self._icon.notify(fit(message, NOTIFY_MAX), "luxstatus")
         except Exception:
             log.warning("tray notification failed: %s", message)
 
@@ -148,6 +183,16 @@ class Tray:
         self._icon.title = tooltip(resolution)
         self._icon.update_menu()  # refresh check marks, e.g. after an override expires
 
-    def run(self) -> None:
-        """Blocks the main thread until Quit."""
-        self._icon.run()
+    def run(self, on_ready: Callable[[], None] | None = None) -> None:
+        """Blocks the main thread until Quit. ``on_ready`` runs once the icon is visible, so a
+        status that arrived during startup can be repainted onto the real icon."""
+
+        def setup(icon: Any) -> None:
+            icon.visible = True
+            if on_ready is not None:
+                try:
+                    on_ready()
+                except Exception:
+                    log.exception("tray setup callback failed")
+
+        self._icon.run(setup)

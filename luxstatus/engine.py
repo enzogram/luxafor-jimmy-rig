@@ -37,6 +37,7 @@ class Engine:
         self.latest: dict[Source, SourceUpdate] = {}
         self.current: Resolution | None = None
         self.queue: asyncio.Queue[SourceUpdate] = asyncio.Queue()
+        self._failing: set[str] = set()
 
     def apply(self, update: SourceUpdate) -> None:
         self.latest[update.source] = update
@@ -62,12 +63,12 @@ class Engine:
         loop = asyncio.get_running_loop()
         next_tick = loop.time()
         stopper = asyncio.ensure_future(stop.wait())
-        self.step()  # set the light at startup without waiting for a source
+        self._guarded("resolve", self.step)  # set the light at startup without waiting
         try:
             while not stop.is_set():
                 if loop.time() >= next_tick:
                     next_tick = loop.time() + self.config.resolver.tick_seconds
-                    self.light.tick()
+                    self._guarded("light tick", self.light.tick)
                 getter = asyncio.ensure_future(self.queue.get())
                 await asyncio.wait(
                     {getter, stopper},
@@ -81,6 +82,20 @@ class Engine:
                 else:
                     getter.cancel()  # a cancelled Queue.get() does not consume an item
                 if not stop.is_set():
-                    self.step()
+                    self._guarded("resolve", self.step)
         finally:
             stopper.cancel()
+
+    def _guarded(self, what: str, fn: Callable[[], object]) -> None:
+        """Run ``fn``; an error is logged once per failure streak and never ends the loop,
+        so one bad resolve or light write can't freeze the light for good."""
+        try:
+            fn()
+        except Exception:
+            if what not in self._failing:
+                log.exception("%s failed; will keep trying", what)
+                self._failing.add(what)
+        else:
+            if what in self._failing:
+                log.info("%s recovered", what)
+                self._failing.discard(what)

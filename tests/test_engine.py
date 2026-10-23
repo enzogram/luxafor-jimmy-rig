@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from dataclasses import replace
 from datetime import datetime
 
@@ -54,9 +55,10 @@ def test_run_sets_light_at_startup_processes_queue_and_stops():
         task = asyncio.create_task(engine.run(stop))
         await asyncio.sleep(0.05)
         engine.queue.put_nowait(call())
-        for _ in range(100):
-            if light.shown and light.shown[-1].status is Status.CALL:
-                break
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 2  # by time: Windows' coarse clock makes short sleeps instant
+        while not (light.shown and light.shown[-1].status is Status.CALL):
+            assert loop.time() < deadline, "light never showed CALL"
             await asyncio.sleep(0.01)
         stop.set()
         await asyncio.wait_for(task, 1)
@@ -86,3 +88,48 @@ def test_ticks_keep_coming_under_a_steady_update_stream():
 
     asyncio.run(main())
     assert light.ticks >= 3  # ~6 expected
+
+
+def test_a_failing_light_or_resolve_does_not_end_the_loop(caplog):
+    caplog.set_level(logging.INFO, logger="luxstatus.engine")
+
+    class BrokenLight(FakeLight):
+        def __init__(self):
+            super().__init__()
+            self.broken = True
+
+        def show(self, resolution):
+            if self.broken:
+                raise ValueError("bad report")
+            super().show(resolution)
+
+        def tick(self):
+            if self.broken:
+                raise OSError("device gone")
+            super().tick()
+
+    light = BrokenLight()
+    cfg = replace(Config(), resolver=replace(Config().resolver, tick_seconds=0.02))
+    engine = Engine(cfg, light, clock=lambda: NOW)
+
+    async def main():
+        stop = asyncio.Event()
+        task = asyncio.create_task(engine.run(stop))
+        await asyncio.sleep(0.1)
+        assert not task.done()  # still running despite errors
+        light.broken = False
+        engine.current = None  # force a rewrite now that the light works
+        engine.queue.put_nowait(call())
+        # Wait by elapsed time: on Windows' coarse clock short sleeps return immediately.
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 2
+        while not (light.shown and light.ticks) and loop.time() < deadline:
+            await asyncio.sleep(0.01)
+        stop.set()
+        await asyncio.wait_for(task, 1)
+
+    asyncio.run(main())
+    assert light.shown[-1].status is Status.CALL
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages.count("light tick failed; will keep trying") == 1  # logged once, not per tick
+    assert "light tick recovered" in messages

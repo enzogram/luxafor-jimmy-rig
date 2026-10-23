@@ -155,18 +155,63 @@ def from_dict(data: dict[str, Any]) -> Config:
     )
 
 
+# Allowed ranges (inclusive) for numeric keys; anything else only needs the right type.
+_RANGES: dict[str, tuple[float, float]] = {
+    "poll_seconds": (0.1, 3600),
+    "lookahead_minutes": (1, 7 * 24 * 60),
+    "on_debounce_reads": (1, 100),
+    "off_debounce_seconds": (0, 3600),
+    "flash_seconds": (0, 60),
+    "flash_speed": (0, 255),
+    "flash_repeat": (0, 255),
+    "tick_seconds": (0.1, 60),
+    "stale_factor": (1, 100),
+}
+
+
 def _section(default: Any, raw: dict[str, Any], name: str, convert=None) -> Any:
     known = {f.name: f for f in fields(default)}
     values = {}
     for key, value in raw.items():
         if key not in known:
             raise ConfigError(f"unknown key [{name}].{key}")
+        where = f"[{name}].{key}"
         if convert is not None:
-            value = convert(value, f"[{name}].{key}")
-        elif isinstance(getattr(default, key), tuple):
-            value = tuple(str(v) for v in value)
+            value = convert(value, where)
+        else:
+            value = _typed(str(known[key].type), value, where)
         values[key] = value
     return replace(default, **values)
+
+
+def _typed(kind: str, value: Any, where: str) -> Any:
+    """Check ``value`` against the field's declared type; numbers also against _RANGES.
+
+    A wrong type in a running app would otherwise surface far from the config (e.g. a string
+    poll interval crashing the engine thread), so reject it here with a clear message.
+    """
+    if kind == "bool":
+        if not isinstance(value, bool):
+            raise ConfigError(f"{where} must be true or false, got {value!r}")
+        return value
+    if kind in ("int", "float"):
+        is_number = isinstance(value, int | float) and not isinstance(value, bool)
+        if not is_number or (kind == "int" and not isinstance(value, int)):
+            noun = "a whole number" if kind == "int" else "a number"
+            raise ConfigError(f"{where} must be {noun}, got {value!r}")
+        lo, hi = _RANGES.get(where.rsplit(".", 1)[1], (float("-inf"), float("inf")))
+        if not lo <= value <= hi:
+            raise ConfigError(f"{where} must be between {lo:g} and {hi:g}, got {value!r}")
+        return value
+    if kind == "str":
+        if not isinstance(value, str):
+            raise ConfigError(f"{where} must be a string, got {value!r}")
+        return value
+    if kind.startswith("tuple[str"):
+        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+            raise ConfigError(f'{where} must be a list of strings like ["a", "b"], got {value!r}')
+        return tuple(value)
+    raise ConfigError(f"{where} has an unsupported type {kind}")
 
 
 def _colour(value: Any, where: str) -> RGB:

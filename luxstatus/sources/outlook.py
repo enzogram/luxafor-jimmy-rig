@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -146,11 +147,27 @@ class OutlookThread(threading.Thread):
         try:
             while not self._stop_event.is_set():
                 self.poll_once()
-                self._stop_event.wait(self.config.poll_seconds)
+                self._idle(self.config.poll_seconds)
         finally:
             self.client.reset()  # release COM objects on this thread
             if self.com:
                 pythoncom.CoUninitialize()
+
+    def _idle(self, seconds: float) -> None:
+        """Wait between polls. A COM thread (STA) owns a hidden window and must keep pumping
+        messages, or programs that broadcast with SendMessage can hang waiting for it."""
+        if not self.com:
+            self._stop_event.wait(seconds)
+            return
+        import pythoncom
+
+        deadline = time.monotonic() + seconds
+        while not self._stop_event.is_set():
+            pythoncom.PumpWaitingMessages()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            self._stop_event.wait(min(0.2, remaining))
 
     def stop(self, timeout: float = 5) -> None:
         self._stop_event.set()

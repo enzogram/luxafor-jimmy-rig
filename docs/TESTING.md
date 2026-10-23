@@ -22,6 +22,7 @@ Build with `./scripts/build.ps1` (or download `luxstatus-exe` from CI) and copy 
 - [ ] Win+L turns the light off within ~2 s; unlocking restores it.
 - [ ] Ticking "Start at login", then signing out and back in, starts the app automatically.
 - [ ] Unticking it removes the shortcut (`shell:startup` no longer has `luxstatus.lnk`).
+- [ ] Signing out (or restarting) while the light is on is not blocked by luxstatus, and the light turns off.
 
 ## Milestone 7 — polish
 
