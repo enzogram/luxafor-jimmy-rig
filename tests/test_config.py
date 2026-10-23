@@ -81,3 +81,29 @@ def test_template_is_shipped_and_matches_defaults():
 
     assert template_path().exists()
     assert load(template_path()) == Config()
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"session": {"poll_seconds": "2"}},
+        {"resolver": {"tick_seconds": 0}},
+        {"effects": {"flash_repeat": 300}},
+        {"effects": {"flash_speed": 2.5}},
+        {"effects": {"call_flash": "yes"}},
+        {"devices": {"include": "zoom"}},
+        {"devices": {"exclude": [1]}},
+        {"devices": {"on_debounce_reads": 0}},
+        {"devices": {"enabled": 1}},
+        {"hotkeys": {"dnd": 5}},
+        {"outlook": {"lookahead_minutes": True}},
+    ],
+)
+def test_wrong_types_and_ranges_are_rejected(data):
+    with pytest.raises(ConfigError):
+        from_dict(data)
+
+
+def test_floats_accepted_where_declared():
+    cfg = from_dict({"devices": {"poll_seconds": 2.5, "off_debounce_seconds": 0}})
+    assert cfg.devices.poll_seconds == 2.5 and cfg.devices.off_debounce_seconds == 0
