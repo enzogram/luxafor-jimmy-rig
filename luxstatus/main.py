@@ -18,7 +18,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from luxstatus import config as config_mod
 from luxstatus import logs
@@ -222,15 +222,30 @@ def start_outlook(cfg: Config, post: Callable[[SourceUpdate], None]) -> OutlookT
     return thread
 
 
+class Stoppable(Protocol):
+    def stop(self) -> None: ...
+
+
 class Runtime:
     """Owns the config-dependent pieces outside the engine thread and applies reloads."""
 
-    def __init__(self, cfg: Config, app: App, tray: Tray | None = None) -> None:
+    def __init__(
+        self,
+        cfg: Config,
+        app: App,
+        tray: Tray | None = None,
+        hotkeys_factory: Callable[[Config, ManualControl], Stoppable | None] = start_hotkeys,
+        outlook_factory: Callable[
+            [Config, Callable[[SourceUpdate], None]], Stoppable | None
+        ] = start_outlook,
+    ) -> None:
         self.cfg = cfg
         self.app = app
         self.tray = tray
-        self.hotkeys = start_hotkeys(cfg, app.manual)
-        self.outlook = start_outlook(cfg, app.post)
+        self._start_hotkeys = hotkeys_factory
+        self._start_outlook = outlook_factory
+        self.hotkeys = hotkeys_factory(cfg, app.manual)
+        self.outlook = outlook_factory(cfg, app.post)
 
     def apply(self, cfg: Config, _path: Path | None = None) -> None:
         old, self.cfg = self.cfg, cfg
@@ -240,11 +255,11 @@ class Runtime:
         if cfg.hotkeys != old.hotkeys:
             if self.hotkeys is not None:
                 self.hotkeys.stop()
-            self.hotkeys = start_hotkeys(cfg, self.app.manual)
+            self.hotkeys = self._start_hotkeys(cfg, self.app.manual)
         if cfg.outlook != old.outlook:
             if self.outlook is not None:
                 self.outlook.stop()
-            self.outlook = start_outlook(cfg, self.app.post)
+            self.outlook = self._start_outlook(cfg, self.app.post)
 
     def stop(self) -> None:
         if self.hotkeys is not None:

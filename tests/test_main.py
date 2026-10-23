@@ -188,7 +188,7 @@ def test_source_pollers_keep_debounce_state_across_reload():
     assert p.interval == cfg.devices.poll_seconds
 
 
-def test_runtime_apply_updates_app_and_tray():
+def test_runtime_apply_updates_app_tray_and_restarts_only_changed_threads():
     from luxstatus.main import Runtime
 
     class FakeApp:
@@ -204,12 +204,42 @@ def test_runtime_apply_updates_app_and_tray():
     class FakeTray:
         config = None
 
+    class Thread:
+        def __init__(self, kind, log):
+            self.kind, self.log = kind, log
+            log.append(("start", kind))
+
+        def stop(self):
+            self.log.append(("stop", self.kind))
+
+    events = []
     app, tray = FakeApp(), FakeTray()
-    rt = Runtime(Config(), app, tray)
-    new = replace(Config(), colours=replace(Config().colours, busy=(1, 2, 3)))
-    rt.apply(new)
-    assert app.configs == [new] and tray.config is new and rt.cfg is new
+    rt = Runtime(
+        Config(),
+        app,
+        tray,
+        hotkeys_factory=lambda cfg, manual: Thread("hotkeys", events),
+        outlook_factory=lambda cfg, post: Thread("outlook", events),
+    )
+    assert events == [("start", "hotkeys"), ("start", "outlook")]
+
+    events.clear()
+    colours = replace(Config(), colours=replace(Config().colours, busy=(1, 2, 3)))
+    rt.apply(colours)
+    assert app.configs == [colours] and tray.config is colours and rt.cfg is colours
+    assert events == []  # neither section changed
+
+    hotkeys = replace(colours, hotkeys=replace(colours.hotkeys, dnd="<ctrl>+<alt>+x"))
+    rt.apply(hotkeys)
+    assert events == [("stop", "hotkeys"), ("start", "hotkeys")]
+
+    events.clear()
+    rt.apply(replace(hotkeys, outlook=replace(hotkeys.outlook, poll_seconds=60)))
+    assert events == [("stop", "outlook"), ("start", "outlook")]
+
+    events.clear()
     rt.stop()
+    assert events == [("stop", "hotkeys"), ("stop", "outlook")]
 
 
 def test_ensure_config_file(tmp_path):
