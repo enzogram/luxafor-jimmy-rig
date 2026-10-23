@@ -111,8 +111,22 @@ class OutlookClient:
     def reset(self) -> None:
         self._calendar = None
 
-    def fetch(self, start: datetime, end: datetime) -> list[CalendarItem] | None:
-        """Items overlapping [start, end), or None when Outlook is not running."""
+    def folder_path(self) -> str:
+        """Which calendar is being read (after a fetch); for the probe."""
+        return str(self._calendar.FolderPath) if self._calendar is not None else "?"
+
+    def fetch(
+        self,
+        start: datetime,
+        end: datetime,
+        fmt: Callable[[datetime], str] | None = None,
+        raw: list[Any] | None = None,
+    ) -> list[CalendarItem] | None:
+        """Items overlapping [start, end), or None when Outlook is not running.
+
+        ``fmt`` overrides the date format in the filter and ``raw`` collects the COM items;
+        both are for the probe.
+        """
         if not outlook_running():
             self.reset()
             return None
@@ -124,11 +138,13 @@ class OutlookClient:
         items = self._calendar.Items
         items.IncludeRecurrences = True  # must be set before Sort
         items.Sort("[Start]")
-        restricted = items.Restrict(restrict_filter(start, end, outlook_datetime))
+        restricted = items.Restrict(restrict_filter(start, end, fmt or outlook_datetime))
         # With recurrences, Count is meaningless; only GetFirst/GetNext work.
         result = []
         item = restricted.GetFirst()
         while item is not None:
+            if raw is not None:
+                raw.append(item)
             result.append(
                 CalendarItem(
                     start=com_datetime(item.Start),
