@@ -6,7 +6,9 @@ tentative   = [255, 180, 0]
 busy        = [255, 0, 0]
 call        = [255, 0, 0]
 call_camera = [255, 0, 0]   # used only if devices.camera_distinct = true
-dnd         = [255, 0, 255]
+dnd         = [255, 0, 0]
+oof         = [0, 0, 0]     # out of office; [0, 0, 0] is off
+brightness  = 1.0           # 0.1-1.0, scales every colour on the Flag
 
 [work_hours]
 enabled = true

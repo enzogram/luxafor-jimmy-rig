@@ -182,3 +182,19 @@ def test_flash_restore_without_device_does_not_raise():
     opener.present = False
     sched.fire()
     assert not light.connected
+
+
+def test_defaults_dnd_red_and_oof_off():
+    assert colour_for(Resolution(Status.DND), CFG) == CFG.colours.busy == (255, 0, 0)
+    assert colour_for(Resolution(Status.OOF), CFG) == (0, 0, 0)
+
+
+def test_brightness_dims_the_flag():
+    from luxstatus.light import dimmed
+
+    assert dimmed((255, 180, 0), 0.5) == (128, 90, 0)
+    assert dimmed((255, 0, 0), 1.0) == (255, 0, 0)
+    cfg = replace(CFG, colours=replace(CFG.colours, brightness=0.5))
+    light, opener, _ = flash_light(replace(cfg, effects=replace(cfg.effects, call_flash=False)))
+    light.show(Resolution(Status.BUSY))
+    assert opener.opened[0].writes == [static_report((128, 0, 0))]

@@ -23,14 +23,14 @@ Send this file's checklist with each item marked pass or fail, plus a note on an
 
 ## Milestone 5 — Outlook calendar
 
-Run `uv run python -m luxstatus` or the exe. After 17:00, set `enabled = false` under `[work_hours]` first.
+Run `uv run python -m luxstatus` or the exe. Meetings show at any hour, so no config change is needed after 17:00.
 
 - [ ] A test appointment covering now, shown as **Busy**, turns the light red within ~30 s; the tooltip reads `BUSY — Outlook: <subject> until HH:MM`.
 - [ ] Changing it to **Tentative** turns the light amber within ~30 s.
 - [ ] Deleting it returns the light to green.
 - [ ] During a Busy meeting, a Teams call shows `CALL — MSTeams` (call wins).
 - [ ] Optional: closing Outlook during a meeting returns the light to green after ~90 s; the log says "Outlook not running; calendar unknown".
-- [ ] `uv run python -m luxstatus.probe --hours 24` still lists tomorrow's meetings with the right times. (The date filter now follows the Windows date format, e.g. `10/23/2026 5:27 PM`.)
+- [ ] `uv run python -m luxstatus.probe --hours 24` lists today's and tomorrow's meetings with the right times, marks the current one "covers now", and shows `calendar now: BUSY`.
 
 ## Milestone 6 — exe, lock, single instance, start at login
 
@@ -52,3 +52,6 @@ Build with `./scripts/build.ps1` (or download `luxstatus-exe` from CI) and copy 
 - [ ] Changing `busy` under `[colours]` and saving recolours the light and tray icon within ~2 s during a Busy meeting, with no restart.
 - [ ] Saving a broken file (e.g. delete a `]`) shows a tray notification and the light keeps working; fixing it applies the new settings.
 - [ ] Changing a hotkey under `[hotkeys]` takes effect without a restart.
+- [ ] DND (Ctrl+Alt+D) shows red. If yours is still magenta, your `%APPDATA%\luxstatus\config.toml` predates the change: set `dnd = [255, 0, 0]` or delete the line.
+- [ ] `brightness = 0.3` under `[colours]` visibly dims the Flag within ~2 s; the tray icon stays full colour.
+- [ ] An Outlook entry marked **Out of office** covering now turns the light off (tooltip `OOF — Outlook: …`).

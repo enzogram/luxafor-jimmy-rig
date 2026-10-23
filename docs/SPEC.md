@@ -67,7 +67,8 @@ class Status(Enum):
     OFF        # outside work hours, screen locked, or user turned it off
     AVAILABLE
     TENTATIVE  # tentative calendar block
-    BUSY       # busy calendar block / OOF
+    OOF        # out-of-office calendar block (light off by default)
+    BUSY       # busy calendar block
     CALL       # mic (or camera) in use by a filtered app
     DND        # manual
 ```
@@ -77,8 +78,8 @@ class Status(Enum):
 1. Manual override, if set and not expired. Can be DND, AVAILABLE, or OFF. Manual OFF replaces the separate "Pause light" idea.
 2. Session locked → OFF, even during a call.
 3. Devices: CALL. A live call overrides work hours, so evening calls still show.
-4. Outside work hours → OFF.
-5. Outlook: BUSY (BusyStatus 2 or 3) > TENTATIVE (1). Working Elsewhere (4) counts as AVAILABLE.
+4. Outlook: BUSY (BusyStatus 2) > OOF (3) > TENTATIVE (1). Working Elsewhere (4) counts as AVAILABLE. Like a call, a meeting shows outside work hours too.
+5. Outside work hours → OFF.
 6. AVAILABLE.
 
 The resolver is a pure function of the latest update from each source, the current time and the config. Stateful logic (debounce, override bookkeeping) lives in the sources.
@@ -126,7 +127,7 @@ restricted = items.Restrict(
 - Poll every 30–60 s for a look-ahead window (now → now + 4 h by default) and report the list of calendar blocks. The resolver decides which block covers "now" on every 5 s tick, so meeting starts and ends are on time rather than up to one poll late.
 - Take the busiest `BusyStatus` among blocks covering now. Skip all-day FREE items and cancelled meetings (`MeetingStatus` 5 or 7).
 - With `IncludeRecurrences = True`, `items.Count` is meaningless (2147483647). Iterate with `GetFirst()` / `GetNext()` only.
-- The `Restrict` date format follows the Windows locale. Build it from the user's short date and time (`GetDateFormat`/`GetTimeFormat`, Microsoft's "ddddd h:nn AMPM" advice), falling back to `MM/DD/YYYY hh:mm AM/PM` if that fails, and confirm it with the probe on the real machine.
+- The `Restrict` dates are written `MM/DD/YYYY hh:mm AM/PM`. On the target machine (English US with a custom `dd-MMM-yy` short date) Outlook parses this correctly; building the string from the Windows short-date format returned nothing (and `GetDateFormat` via `pywintypes.Time` shifted the time by the UTC offset). On a new machine, confirm with the probe.
 - pywin32 returns appointment times tagged as UTC although they are local wall-clock times. Strip the tzinfo and treat them as naive local times; the probe prints both to confirm.
 - If Outlook is not running, `Dispatch` will launch it, which is unwanted. Instead, check for a running `OUTLOOK.EXE` first (via `psutil`). Report unknown if it is not running.
 - After sleep/resume or any COM error, drop the cached Outlook objects and reconnect on the next poll.

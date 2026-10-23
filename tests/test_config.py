@@ -107,3 +107,11 @@ def test_wrong_types_and_ranges_are_rejected(data):
 def test_floats_accepted_where_declared():
     cfg = from_dict({"devices": {"poll_seconds": 2.5, "off_debounce_seconds": 0}})
     assert cfg.devices.poll_seconds == 2.5 and cfg.devices.off_debounce_seconds == 0
+
+
+def test_brightness_validated():
+    assert from_dict({"colours": {"brightness": 0.4}}).colours.brightness == 0.4
+    assert from_dict({"colours": {"brightness": 1}}).colours.brightness == 1
+    for bad in (0, 1.5, "half"):
+        with pytest.raises(ConfigError):
+            from_dict({"colours": {"brightness": bad}})

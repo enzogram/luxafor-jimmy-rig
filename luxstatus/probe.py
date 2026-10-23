@@ -105,17 +105,23 @@ def probe_outlook(hours: float) -> None:
         return
     now = datetime.now()
     end = now + timedelta(hours=hours)
-    print(f"Restrict filter: {outlook.restrict_filter(now, end, outlook.outlook_datetime)}")
+    print(f"now (local): {now:%a %Y-%m-%d %H:%M:%S}")
     pythoncom.CoInitialize()
     try:
         client = outlook.OutlookClient()
-        items = client.fetch(now, end) or []
+        print(f"Restrict filter: {outlook.restrict_filter(now, end)!r}")
+        raw: list = []
+        items = client.fetch(now, end, raw=raw) or []
         print(f"{len(items)} item(s) in the next {hours:g} h (times should match Outlook's):")
-        for i in items:
+        for i, r in zip(items, raw, strict=True):
+            covers = "  <- covers now" if i.start <= now < i.end else ""
             print(
                 f"  {i.start:%a %H:%M}-{i.end:%H:%M} busy={i.busy_status} "
-                f"all_day={i.all_day} meeting_status={i.meeting_status} {i.subject!r}"
+                f"all_day={i.all_day} meeting_status={i.meeting_status} {i.subject!r}{covers}"
             )
+            print(f"    raw Start={r.Start!r} End={r.End!r}")
+        print(f"calendar folder: {client.folder_path()}")
+
         blocks = outlook.to_blocks(items)
         status, block = calendar_status(blocks, now)
         print(
@@ -124,7 +130,7 @@ def probe_outlook(hours: float) -> None:
         )
         update = SourceUpdate(Source.OUTLOOK, now, blocks=blocks)
         resolution = resolve({Source.OUTLOOK: update}, now, Config())
-        print(f"resolver (Outlook only): {resolution.describe()}")
+        print(f"resolver (Outlook only, default work hours): {resolution.describe()}")
     finally:
         pythoncom.CoUninitialize()
 

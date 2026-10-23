@@ -116,16 +116,19 @@ def test_thread_polls_and_stops_promptly():
     assert client.resets >= 1  # COM objects released on the thread
 
 
-def test_restrict_filter_uses_given_formatter():
-    f = restrict_filter(T, T + H, fmt=lambda dt: dt.strftime("%d/%m/%Y %H:%M"))
-    assert f == "[Start] < '21/10/2026 10:00' AND [End] > '21/10/2026 09:00'"
+def test_real_probe_case_meeting_in_progress_is_busy():
+    """From the target machine: 16:56 on Fri 23 Oct, two back-to-back Busy meetings."""
+    from luxstatus.state import Status, calendar_status
 
-
-def test_outlook_datetime_falls_back_to_us_order_off_windows(monkeypatch):
-    from luxstatus.sources import outlook
-
-    def broken(dt):
-        raise ImportError("no win32api")
-
-    monkeypatch.setattr(outlook, "locale_datetime", broken)
-    assert outlook.outlook_datetime(T) == "10/21/2026 09:00 AM"
+    now = datetime(2026, 10, 23, 16, 56)
+    assert restrict_filter(now, now + timedelta(hours=24)) == (
+        "[Start] < '10/24/2026 04:56 PM' AND [End] > '10/23/2026 04:56 PM'"
+    )
+    items = [
+        CalendarItem(datetime(2026, 10, 23, 16, 0), datetime(2026, 10, 23, 17, 30), OL_BUSY, "a"),
+        CalendarItem(datetime(2026, 10, 23, 17, 30), datetime(2026, 10, 23, 18, 25), OL_BUSY, "b"),
+    ]
+    status, block = calendar_status(to_blocks(items), now)
+    assert (status, block.subject) == (Status.BUSY, "a")
+    status, block = calendar_status(to_blocks(items), datetime(2026, 10, 23, 17, 30))
+    assert (status, block.subject) == (Status.BUSY, "b")  # hand-over at the boundary

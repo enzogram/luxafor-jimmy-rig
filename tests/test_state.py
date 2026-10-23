@@ -47,12 +47,16 @@ def test_nothing_reported_is_available():
 def test_outside_work_hours_is_off():
     assert status_of(now=EVENING) is Status.OFF
     assert status_of(now=SATURDAY) is Status.OFF
-    assert (
-        status_of(
-            outlook(block(OL_BUSY, start=EVENING, end=EVENING + timedelta(hours=1))), now=EVENING
-        )
-        is Status.OFF
-    )
+
+
+def test_meeting_outside_work_hours_still_shows():
+    evening = block(OL_BUSY, start=EVENING, end=EVENING + timedelta(hours=1))
+    assert status_of(outlook(evening, ts=EVENING), now=EVENING) is Status.BUSY
+    early = block(OL_TENTATIVE, start=SATURDAY, end=SATURDAY + timedelta(hours=1))
+    assert status_of(outlook(early, ts=SATURDAY), now=SATURDAY) is Status.TENTATIVE
+    # Working elsewhere outside hours is still just "off".
+    elsewhere = block(OL_WORKING_ELSEWHERE, start=EVENING, end=EVENING + timedelta(hours=1))
+    assert status_of(outlook(elsewhere, ts=EVENING), now=EVENING) is Status.OFF
 
 
 @pytest.mark.parametrize("status", [Status.DND, Status.AVAILABLE, Status.OFF])
@@ -111,7 +115,7 @@ def test_call_carries_camera_flag():
     ("busy", "expected"),
     [
         (OL_BUSY, Status.BUSY),
-        (OL_OOF, Status.BUSY),
+        (OL_OOF, Status.OOF),
         (OL_TENTATIVE, Status.TENTATIVE),
         (OL_WORKING_ELSEWHERE, Status.AVAILABLE),
         (OL_FREE, Status.AVAILABLE),
@@ -165,3 +169,10 @@ def test_work_hours_disabled():
 
     cfg = replace(CFG, work_hours=replace(CFG.work_hours, enabled=False))
     assert resolve({}, EVENING, cfg).status is Status.AVAILABLE
+
+
+def test_overlapping_blocks_busy_beats_oof_beats_tentative():
+    s, b = calendar_status([block(OL_OOF, subject="away"), block(OL_BUSY, subject="m")], NOW)
+    assert (s, b.subject) == (Status.BUSY, "m")
+    s, b = calendar_status([block(OL_TENTATIVE, subject="t"), block(OL_OOF, subject="away")], NOW)
+    assert (s, b.subject) == (Status.OOF, "away")

@@ -12,13 +12,16 @@ Highest priority first:
 
 | Situation | Light |
 |---|---|
-| Manual override from the tray or a hotkey | DND magenta, Available green, Off |
+| Manual override from the tray or a hotkey | DND red, Available green, Off |
 | Screen locked | Off (even during a call) |
 | Mic or camera in use by Teams, Zoom, Webex or a browser | Red |
+| Outlook meeting marked Busy (at any hour) | Red |
+| Outlook marked Out of office (at any hour) | Off (nobody at the desk); set `oof` to show a colour |
+| Outlook meeting marked Tentative (at any hour) | Amber |
 | Outside work hours (Mon–Fri 07:30–17:00 by default) | Off |
-| Outlook meeting marked Busy or Out of office | Red |
-| Outlook meeting marked Tentative | Amber |
 | Otherwise | Green |
+
+Red always means "don't interrupt", whatever the reason; the tray tooltip says which. Overlapping calendar entries rank Busy > Out of office > Tentative. Colours and `brightness` (0.1–1.0, dims the Flag only) are under `[colours]`.
 
 Classic Outlook must be running for the calendar to count; if it is closed, the calendar is ignored after about 90 s.
 

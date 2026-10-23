@@ -14,7 +14,8 @@ class Status(Enum):
     OFF = "off"  # outside work hours, screen locked, or user turned it off
     AVAILABLE = "available"
     TENTATIVE = "tentative"  # tentative calendar block
-    BUSY = "busy"  # busy calendar block / OOF
+    OOF = "oof"  # out-of-office calendar block
+    BUSY = "busy"  # busy calendar block
     CALL = "call"  # mic (or camera) in use by a filtered app
     DND = "dnd"  # manual
 
@@ -29,7 +30,10 @@ class Source(Enum):
 # Outlook OlBusyStatus values.
 OL_FREE, OL_TENTATIVE, OL_BUSY, OL_OOF, OL_WORKING_ELSEWHERE = range(5)
 
-_CALENDAR_RANK = {OL_TENTATIVE: 1, OL_BUSY: 2, OL_OOF: 2}
+# Highest rank wins when blocks overlap: a Busy meeting attended during an out-of-office day
+# shows Busy; out of office outranks a Tentative hold.
+_CALENDAR_RANK = {OL_TENTATIVE: 1, OL_OOF: 2, OL_BUSY: 3}
+_RANK_STATUS = {1: Status.TENTATIVE, 2: Status.OOF, 3: Status.BUSY}
 
 
 @dataclass(frozen=True)
@@ -92,15 +96,17 @@ def resolve(latest: Mapping[Source, SourceUpdate], now: datetime, config: Config
     if devices and devices.status is Status.CALL:
         return Resolution(Status.CALL, Source.DEVICES, devices.detail, devices.camera)
 
-    if not in_work_hours(now, config.work_hours):
-        return Resolution(Status.OFF, None, "Outside work hours")
-
+    # Like a call, a Busy/Tentative meeting shows at any hour: work hours only decide whether
+    # an empty calendar means AVAILABLE or OFF.
     outlook = fresh.get(Source.OUTLOOK)
     if outlook:
         status, block = calendar_status(outlook.blocks, now)
         if status is not None and block is not None:
             detail = f"Outlook: {block.subject or '(no subject)'} until {block.end:%H:%M}"
             return Resolution(status, Source.OUTLOOK, detail)
+
+    if not in_work_hours(now, config.work_hours):
+        return Resolution(Status.OFF, None, "Outside work hours")
 
     return Resolution(Status.AVAILABLE)
 
@@ -131,7 +137,7 @@ def in_work_hours(now: datetime, wh: WorkHours) -> bool:
 def calendar_status(
     blocks: Iterable[CalendarBlock], now: datetime
 ) -> tuple[Status | None, CalendarBlock | None]:
-    """Busiest block covering ``now``. BUSY/OOF beats TENTATIVE; free/elsewhere count as nothing."""
+    """Busiest block covering ``now``: BUSY > OOF > TENTATIVE; free/elsewhere count as nothing."""
     best: CalendarBlock | None = None
     best_rank = 0
     for block in blocks:
@@ -140,4 +146,4 @@ def calendar_status(
             best, best_rank = block, rank
     if best is None:
         return None, None
-    return (Status.BUSY if best_rank == 2 else Status.TENTATIVE), best
+    return _RANK_STATUS[best_rank], best

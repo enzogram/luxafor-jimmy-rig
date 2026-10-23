@@ -47,46 +47,16 @@ def to_blocks(items: Iterable[CalendarItem]) -> tuple[CalendarBlock, ...]:
     )
 
 
-def us_datetime(dt: datetime) -> str:
-    return dt.strftime("%m/%d/%Y %I:%M %p")
+def restrict_filter(start: datetime, end: datetime) -> str:
+    """Items overlapping [start, end).
 
-
-def locale_datetime(dt: datetime) -> str:
-    """Short date and time (no seconds) in the user's Windows locale: what Outlook's Restrict
-    expects (Microsoft's guidance is the VBA format "ddddd h:nn AMPM")."""
-    import pywintypes
-    import win32api
-
-    LOCALE_USER_DEFAULT = 0x0400
-    DATE_SHORTDATE = 0x0001
-    TIME_NOSECONDS = 0x0002
-    t = pywintypes.Time(dt)
-    date = win32api.GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, t, None)
-    clock = win32api.GetTimeFormat(LOCALE_USER_DEFAULT, TIME_NOSECONDS, t, None)
-    return f"{date} {clock}"
-
-
-_warned_locale = False
-
-
-def outlook_datetime(dt: datetime) -> str:
-    """``locale_datetime``, falling back to US order if the Windows call is unavailable."""
-    global _warned_locale
-    try:
-        return locale_datetime(dt)
-    except Exception:
-        if not _warned_locale:
-            log.warning("could not format dates for the Windows locale; using MM/DD/YYYY")
-            _warned_locale = True
-        return us_datetime(dt)
-
-
-def restrict_filter(
-    start: datetime, end: datetime, fmt: Callable[[datetime], str] = us_datetime
-) -> str:
-    """Items overlapping [start, end). Outlook parses the dates using the Windows locale, so
-    the app passes ``outlook_datetime``; the US default keeps this pure for tests."""
-    return f"[Start] < '{fmt(end)}' AND [End] > '{fmt(start)}'"
+    Dates are always written MM/DD/YYYY hh:mm AM/PM. On the target machine (English US,
+    custom short date dd-MMM-yy) Outlook parses this correctly, while building the string from
+    the Windows short-date format found nothing: GetDateFormat via pywintypes.Time also shifted
+    the time by the UTC offset. Keep this unless the probe shows otherwise on a new machine.
+    """
+    fmt = "%m/%d/%Y %I:%M %p"
+    return f"[Start] < '{end.strftime(fmt)}' AND [End] > '{start.strftime(fmt)}'"
 
 
 def com_datetime(value: Any) -> datetime:
@@ -111,8 +81,15 @@ class OutlookClient:
     def reset(self) -> None:
         self._calendar = None
 
-    def fetch(self, start: datetime, end: datetime) -> list[CalendarItem] | None:
-        """Items overlapping [start, end), or None when Outlook is not running."""
+    def folder_path(self) -> str:
+        """Which calendar is being read (after a fetch); for the probe."""
+        return str(self._calendar.FolderPath) if self._calendar is not None else "?"
+
+    def fetch(
+        self, start: datetime, end: datetime, raw: list[Any] | None = None
+    ) -> list[CalendarItem] | None:
+        """Items overlapping [start, end), or None when Outlook is not running. ``raw``
+        collects the COM items, for the probe."""
         if not outlook_running():
             self.reset()
             return None
@@ -124,11 +101,13 @@ class OutlookClient:
         items = self._calendar.Items
         items.IncludeRecurrences = True  # must be set before Sort
         items.Sort("[Start]")
-        restricted = items.Restrict(restrict_filter(start, end, outlook_datetime))
+        restricted = items.Restrict(restrict_filter(start, end))
         # With recurrences, Count is meaningless; only GetFirst/GetNext work.
         result = []
         item = restricted.GetFirst()
         while item is not None:
+            if raw is not None:
+                raw.append(item)
             result.append(
                 CalendarItem(
                     start=com_datetime(item.Start),
