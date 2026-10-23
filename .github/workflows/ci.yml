@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+      - name: Import Windows adapters
+        if: runner.os == 'Windows'
+        run: uv run python -c "import hid, win32com.client, pythoncom, pystray, psutil, winreg, luxstatus.probe, luxstatus.tray, luxstatus.hotkeys, luxstatus.main"
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: ./scripts/build.ps1
+      - name: Self-check the packaged exe
+        run: |
+          $p = Start-Process dist\luxstatus.exe -ArgumentList "--check" -Wait -PassThru
+          Get-Content "$env:LOCALAPPDATA\luxstatus\luxstatus.log" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: luxstatus-exe
+          path: dist/luxstatus.exe

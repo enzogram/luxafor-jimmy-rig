@@ -1,0 +1,24 @@
+# Manual tests still to run
+
+Checks that need the real machine (Flag, Outlook, Windows session). Tick them off as they pass; once a milestone's list is done, mark it ✅ in `PLAN.md`.
+
+## Milestone 5 — Outlook calendar
+
+Run `uv run python -m luxstatus` or the exe. After 17:00, set `enabled = false` under `[work_hours]` first.
+
+- [ ] A test appointment covering now, shown as **Busy**, turns the light red within ~30 s; the tooltip reads `BUSY — Outlook: <subject> until HH:MM`.
+- [ ] Changing it to **Tentative** turns the light amber within ~30 s.
+- [ ] Deleting it returns the light to green.
+- [ ] During a Busy meeting, a Teams call shows `CALL — MSTeams` (call wins).
+- [ ] Optional: closing Outlook during a meeting returns the light to green after ~90 s; the log says "Outlook not running; calendar unknown".
+
+## Milestone 6 — exe, lock, single instance, start at login
+
+Build with `./scripts/build.ps1` (or download `luxstatus-exe` from CI) and copy `dist\luxstatus.exe` to e.g. `%LOCALAPPDATA%\Programs\luxstatus\`. Copy an edited `config.toml` to `%APPDATA%\luxstatus\config.toml` if you have one.
+
+- [ ] The exe starts with a tray icon and no console window.
+- [ ] "Open log" shows which config file was loaded.
+- [ ] Starting the exe a second time shows "luxstatus is already running" and exits.
+- [ ] Win+L turns the light off within ~2 s; unlocking restores it.
+- [ ] Ticking "Start at login", then signing out and back in, starts the app automatically.
+- [ ] Unticking it removes the shortcut (`shell:startup` no longer has `luxstatus.lnk`).
