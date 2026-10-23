@@ -69,11 +69,12 @@ def test_light_follows_a_call_end_to_end():
         task = asyncio.create_task(run(engine, stop, [Poller("devices", devices.poll, 0.01)]))
 
         async def until(status):
-            for _ in range(200):
-                if light.shown and light.shown[-1].status is status:
-                    return
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + 2  # by time: Windows' coarse clock makes short sleeps instant
+            while not (light.shown and light.shown[-1].status is status):
+                if loop.time() > deadline:
+                    raise AssertionError(f"light never showed {status}")
                 await asyncio.sleep(0.01)
-            raise AssertionError(f"light never showed {status}")
 
         await until(Status.AVAILABLE)
         registry[MICROPHONE] = {"MSTeams_8wekyb3d8bbwe": LIVE}

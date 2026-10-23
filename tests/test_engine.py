@@ -55,9 +55,10 @@ def test_run_sets_light_at_startup_processes_queue_and_stops():
         task = asyncio.create_task(engine.run(stop))
         await asyncio.sleep(0.05)
         engine.queue.put_nowait(call())
-        for _ in range(100):
-            if light.shown and light.shown[-1].status is Status.CALL:
-                break
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 2  # by time: Windows' coarse clock makes short sleeps instant
+        while not (light.shown and light.shown[-1].status is Status.CALL):
+            assert loop.time() < deadline, "light never showed CALL"
             await asyncio.sleep(0.01)
         stop.set()
         await asyncio.wait_for(task, 1)
@@ -119,9 +120,10 @@ def test_a_failing_light_or_resolve_does_not_end_the_loop(caplog):
         light.broken = False
         engine.current = None  # force a rewrite now that the light works
         engine.queue.put_nowait(call())
-        for _ in range(100):
-            if light.shown and light.ticks:
-                break
+        # Wait by elapsed time: on Windows' coarse clock short sleeps return immediately.
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 2
+        while not (light.shown and light.ticks) and loop.time() < deadline:
             await asyncio.sleep(0.01)
         stop.set()
         await asyncio.wait_for(task, 1)

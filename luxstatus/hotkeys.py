@@ -62,7 +62,7 @@ class HotkeyThread(threading.Thread):
         super().__init__(name="hotkeys", daemon=True)
         self.bindings = bindings
         self._thread_id: int | None = None
-        self._started = threading.Event()
+        self._ready = threading.Event()
 
     def run(self) -> None:
         import ctypes
@@ -89,7 +89,7 @@ class HotkeyThread(threading.Thread):
         # even when no hotkey was registered.
         PM_NOREMOVE = 0x0000
         user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, PM_NOREMOVE)
-        self._started.set()
+        self._ready.set()
 
         try:
             while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
@@ -103,7 +103,7 @@ class HotkeyThread(threading.Thread):
                 user32.UnregisterHotKey(None, i)
 
     def stop(self) -> None:
-        self._started.wait(timeout=2)
+        self._ready.wait(timeout=2)
         if self._thread_id is not None:
             import ctypes
 
