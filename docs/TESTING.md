@@ -2,6 +2,25 @@
 
 Checks that need the real machine (Flag, Outlook, Windows session). Tick them off as they pass; once a milestone's list is done, mark it ✅ in `PLAN.md`.
 
+## Before you start
+
+```powershell
+git checkout main
+git pull
+uv sync
+```
+
+Run from source with `uv run python -m luxstatus` (tray) or `uv run python -m luxstatus --console -v` (live log in the terminal, most useful when something looks wrong). For the exe checks, build it with `./scripts/build.ps1`.
+
+## Reporting back
+
+Send this file's checklist with each item marked pass or fail, plus a note on anything that looked odd. For each failure, include:
+
+- **What you did and what you saw** (light colour, tooltip text, any notification).
+- **The log:** tray → Open log, or `%LOCALAPPDATA%\luxstatus\luxstatus.log`. The lines around the time of the failure are enough; it contains meeting subjects, so trim anything private.
+- **The version:** output of `git log -1 --oneline`, or say you used the exe from CI.
+- For Outlook problems, the Outlook section of `uv run python -m luxstatus.probe --hours 24`.
+
 ## Milestone 5 — Outlook calendar
 
 Run `uv run python -m luxstatus` or the exe. After 17:00, set `enabled = false` under `[work_hours]` first.
@@ -11,6 +30,7 @@ Run `uv run python -m luxstatus` or the exe. After 17:00, set `enabled = false` 
 - [ ] Deleting it returns the light to green.
 - [ ] During a Busy meeting, a Teams call shows `CALL — MSTeams` (call wins).
 - [ ] Optional: closing Outlook during a meeting returns the light to green after ~90 s; the log says "Outlook not running; calendar unknown".
+- [ ] `uv run python -m luxstatus.probe --hours 24` still lists tomorrow's meetings with the right times. (The date filter now follows the Windows date format, e.g. `10/23/2026 5:27 PM`.)
 
 ## Milestone 6 — exe, lock, single instance, start at login
 

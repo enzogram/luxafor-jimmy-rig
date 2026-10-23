@@ -105,7 +105,7 @@ def probe_outlook(hours: float) -> None:
         return
     now = datetime.now()
     end = now + timedelta(hours=hours)
-    print(f"Restrict filter: {outlook.restrict_filter(now, end)}")
+    print(f"Restrict filter: {outlook.restrict_filter(now, end, outlook.outlook_datetime)}")
     pythoncom.CoInitialize()
     try:
         client = outlook.OutlookClient()
