@@ -36,6 +36,12 @@ exclude = []
 dnd  = "<ctrl>+<alt>+d"
 auto = "<ctrl>+<alt>+a"
 
+[effects]
+call_flash = true      # strobe briefly when a call starts, then hold solid
+flash_seconds = 2
+flash_speed = 20       # lower is faster
+flash_repeat = 3
+
 [resolver]
 tick_seconds = 5
 stale_factor = 3

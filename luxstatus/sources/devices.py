@@ -139,6 +139,13 @@ class DevicesSource:
         self._detail = ""
         self._camera = False
 
+    def reconfigure(self, config: DevicesConfig) -> None:
+        """Apply new filters and thresholds, keeping debounce state so a call in progress
+        does not flicker."""
+        self.config = config
+        self.debouncer.on_reads = config.on_debounce_reads
+        self.debouncer.off_after = timedelta(seconds=config.off_debounce_seconds)
+
     def poll(self, now: datetime) -> SourceUpdate:
         names_cache: list[set[str]] = []
 

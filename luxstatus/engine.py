@@ -60,14 +60,13 @@ class Engine:
     async def run(self, stop: asyncio.Event) -> None:
         """Run until ``stop`` is set. Ticks happen on schedule even under a steady update stream."""
         loop = asyncio.get_running_loop()
-        tick = self.config.resolver.tick_seconds
         next_tick = loop.time()
         stopper = asyncio.ensure_future(stop.wait())
         self.step()  # set the light at startup without waiting for a source
         try:
             while not stop.is_set():
                 if loop.time() >= next_tick:
-                    next_tick = loop.time() + tick
+                    next_tick = loop.time() + self.config.resolver.tick_seconds
                     self.light.tick()
                 getter = asyncio.ensure_future(self.queue.get())
                 await asyncio.wait(

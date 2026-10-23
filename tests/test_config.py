@@ -74,3 +74,10 @@ def test_find_config_order(tmp_path):
     (appdata / "luxstatus" / "config.toml").write_text("")
     assert find_config(None, str(appdata), cwd, None) == appdata / "luxstatus" / "config.toml"
     assert find_config(None, None, cwd, None) == cwd / "config.toml"
+
+
+def test_template_is_shipped_and_matches_defaults():
+    from luxstatus.config import template_path
+
+    assert template_path().exists()
+    assert load(template_path()) == Config()

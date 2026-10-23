@@ -10,6 +10,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 uv run pyinstaller --noconfirm --clean --onefile --windowed `
     --name luxstatus --icon build/luxstatus.ico --paths . `
     --hidden-import pystray._win32 --hidden-import hid `
+    --add-data "config.toml;." `
     luxstatus/__main__.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

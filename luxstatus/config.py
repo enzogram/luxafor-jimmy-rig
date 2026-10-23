@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import tomllib
 from dataclasses import dataclass, field, fields, replace
 from datetime import time
@@ -66,6 +67,14 @@ class Hotkeys:
 
 
 @dataclass(frozen=True)
+class EffectsConfig:
+    call_flash: bool = True  # strobe briefly when a call starts, then hold solid
+    flash_seconds: float = 2
+    flash_speed: int = 20  # Luxafor strobe speed byte; lower is faster
+    flash_repeat: int = 3
+
+
+@dataclass(frozen=True)
 class ResolverConfig:
     tick_seconds: float = 5
     stale_factor: float = 3
@@ -79,7 +88,19 @@ class Config:
     session: SessionConfig = field(default_factory=SessionConfig)
     devices: DevicesConfig = field(default_factory=DevicesConfig)
     hotkeys: Hotkeys = field(default_factory=Hotkeys)
+    effects: EffectsConfig = field(default_factory=EffectsConfig)
     resolver: ResolverConfig = field(default_factory=ResolverConfig)
+
+
+def template_path() -> Path:
+    """The commented config.toml shipped with the app (bundled into the exe by build.ps1)."""
+    base = getattr(sys, "_MEIPASS", None)
+    root = Path(base) if base else Path(__file__).resolve().parent.parent
+    return root / "config.toml"
+
+
+def user_config_path(appdata: str) -> Path:
+    return Path(appdata) / "luxstatus" / "config.toml"
 
 
 def find_config(
@@ -96,7 +117,7 @@ def find_config(
         return explicit
     candidates = []
     if appdata:
-        candidates.append(Path(appdata) / "luxstatus" / "config.toml")
+        candidates.append(user_config_path(appdata))
     candidates.append(cwd / "config.toml")
     if exe_dir is not None:
         candidates.append(exe_dir / "config.toml")
@@ -129,6 +150,7 @@ def from_dict(data: dict[str, Any]) -> Config:
         session=_section(cfg.session, data.get("session", {}), "session"),
         devices=_section(cfg.devices, data.get("devices", {}), "devices"),
         hotkeys=_section(cfg.hotkeys, data.get("hotkeys", {}), "hotkeys"),
+        effects=_section(cfg.effects, data.get("effects", {}), "effects"),
         resolver=_section(cfg.resolver, data.get("resolver", {}), "resolver"),
     )
 
