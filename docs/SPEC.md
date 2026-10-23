@@ -126,7 +126,7 @@ restricted = items.Restrict(
 - Poll every 30–60 s for a look-ahead window (now → now + 4 h by default) and report the list of calendar blocks. The resolver decides which block covers "now" on every 5 s tick, so meeting starts and ends are on time rather than up to one poll late.
 - Take the busiest `BusyStatus` among blocks covering now. Skip all-day FREE items and cancelled meetings (`MeetingStatus` 5 or 7).
 - With `IncludeRecurrences = True`, `items.Count` is meaningless (2147483647). Iterate with `GetFirst()` / `GetNext()` only.
-- The `Restrict` date format follows the Windows locale. Build it from the user's short date and time (`GetDateFormat`/`GetTimeFormat`, Microsoft's "ddddd h:nn AMPM" advice), falling back to `MM/DD/YYYY hh:mm AM/PM` if that fails, and confirm it with the probe on the real machine.
+- The `Restrict` dates are written `MM/DD/YYYY hh:mm AM/PM`. On the target machine (English US with a custom `dd-MMM-yy` short date) Outlook parses this correctly; building the string from the Windows short-date format returned nothing (and `GetDateFormat` via `pywintypes.Time` shifted the time by the UTC offset). On a new machine, confirm with the probe.
 - pywin32 returns appointment times tagged as UTC although they are local wall-clock times. Strip the tzinfo and treat them as naive local times; the probe prints both to confirm.
 - If Outlook is not running, `Dispatch` will launch it, which is unwanted. Instead, check for a running `OUTLOOK.EXE` first (via `psutil`). Report unknown if it is not running.
 - After sleep/resume or any COM error, drop the cached Outlook objects and reconnect on the next poll.

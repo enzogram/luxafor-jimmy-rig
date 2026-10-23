@@ -109,38 +109,23 @@ def probe_outlook(hours: float) -> None:
     pythoncom.CoInitialize()
     try:
         client = outlook.OutlookClient()
-        # Compare the app's date format with the plain US one; repr() shows hidden characters.
-        formats = [
-            ("app (Windows locale)", outlook.outlook_datetime),
-            ("US", outlook.us_datetime),
-        ]
-        results: dict[str, list] = {}
-        for name, fmt in formats:
-            print(f"\nfilter [{name}]: {outlook.restrict_filter(now, end, fmt)!r}")
-            raw: list = []
-            try:
-                items = client.fetch(now, end, fmt=fmt, raw=raw) or []
-            except Exception as e:
-                print(f"  Restrict failed: {e!r}")
-                client.reset()
-                continue
-            results[name] = items
-            print(f"  {len(items)} item(s) in the next {hours:g} h:")
-            for i, r in zip(items, raw, strict=True):
-                covers = "  <- covers now" if i.start <= now < i.end else ""
-                print(
-                    f"    {i.start:%a %H:%M}-{i.end:%H:%M} busy={i.busy_status} "
-                    f"all_day={i.all_day} meeting_status={i.meeting_status} "
-                    f"{i.subject!r}{covers}"
-                )
-                print(f"      raw Start={r.Start!r} End={r.End!r}")
-        print(f"\ncalendar folder: {client.folder_path()}")
+        print(f"Restrict filter: {outlook.restrict_filter(now, end)!r}")
+        raw: list = []
+        items = client.fetch(now, end, raw=raw) or []
+        print(f"{len(items)} item(s) in the next {hours:g} h (times should match Outlook's):")
+        for i, r in zip(items, raw, strict=True):
+            covers = "  <- covers now" if i.start <= now < i.end else ""
+            print(
+                f"  {i.start:%a %H:%M}-{i.end:%H:%M} busy={i.busy_status} "
+                f"all_day={i.all_day} meeting_status={i.meeting_status} {i.subject!r}{covers}"
+            )
+            print(f"    raw Start={r.Start!r} End={r.End!r}")
+        print(f"calendar folder: {client.folder_path()}")
 
-        items = results.get("app (Windows locale)", [])
         blocks = outlook.to_blocks(items)
         status, block = calendar_status(blocks, now)
         print(
-            f"calendar now (app format): {status.name if status else 'nothing'}"
+            f"\ncalendar now: {status.name if status else 'nothing'}"
             + (f" ({block.subject} until {block.end:%H:%M})" if block else "")
         )
         update = SourceUpdate(Source.OUTLOOK, now, blocks=blocks)

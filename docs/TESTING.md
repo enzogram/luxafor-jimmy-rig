@@ -30,7 +30,7 @@ Run `uv run python -m luxstatus` or the exe. After 17:00, set `enabled = false` 
 - [ ] Deleting it returns the light to green.
 - [ ] During a Busy meeting, a Teams call shows `CALL — MSTeams` (call wins).
 - [ ] Optional: closing Outlook during a meeting returns the light to green after ~90 s; the log says "Outlook not running; calendar unknown".
-- [ ] `uv run python -m luxstatus.probe --hours 24` still lists tomorrow's meetings with the right times. (The date filter now follows the Windows date format, e.g. `10/23/2026 5:27 PM`.)
+- [ ] `uv run python -m luxstatus.probe --hours 24` lists today's and tomorrow's meetings with the right times, marks the current one "covers now", and shows `calendar now: BUSY`.
 
 ## Milestone 6 — exe, lock, single instance, start at login
 

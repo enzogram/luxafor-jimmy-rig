@@ -46,12 +46,3 @@ def test_outlook_thread_with_real_com_pumps_and_stops_promptly():
     thread.stop()
     assert posted and not thread.is_alive()
     assert time.monotonic() - started < 1
-
-
-def test_locale_datetime_formats_with_windows_settings():
-    from datetime import datetime
-
-    from luxstatus.sources.outlook import locale_datetime
-
-    text = locale_datetime(datetime(2026, 10, 21, 9, 5))
-    assert "2026" in text and "9:05" in text  # exact order depends on the runner's locale
